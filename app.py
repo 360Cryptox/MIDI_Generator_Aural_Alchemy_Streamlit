@@ -12,6 +12,7 @@ import math
 import random
 import shutil
 import tempfile
+import base64
 from zipfile import ZipFile
 from collections import Counter
 from typing import List, Optional
@@ -336,55 +337,45 @@ div[data-testid="stMarkdownContainer"] > p:empty {
     unsafe_allow_html=True,
 )
 
+
 # =========================================================
-# Geometry SVG overlay (DATA URI)
+# Geometry SVG overlay (BASE64 DATA URI)  ✅ reliable
 # =========================================================
 GEOM_SVG = """
 <svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="rgba(0,229,255,0.55)"/>
-      <stop offset="0.55" stop-color="rgba(255,255,255,0.20)"/>
-      <stop offset="1" stop-color="rgba(255,215,0,0.40)"/>
+    <linearGradient id="aaGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00E5FF" stop-opacity="0.65"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFD700" stop-opacity="0.45"/>
     </linearGradient>
   </defs>
 
-  <g fill="none" stroke="url(#g1)" stroke-width="2" opacity="0.9">
+  <g fill="none" stroke="url(#aaGrad)" stroke-width="2.2" opacity="0.95">
     <circle cx="600" cy="600" r="420"/>
-    <circle cx="600" cy="600" r="340" opacity="0.55"/>
-    <circle cx="600" cy="600" r="260" opacity="0.40"/>
-    <circle cx="600" cy="600" r="190" opacity="0.35"/>
-    <circle cx="600" cy="600" r="120" opacity="0.28"/>
-    <polygon points="600,210 960,840 240,840" opacity="0.35"/>
-    <polygon points="600,300 870,790 330,790" opacity="0.25"/>
-    <circle cx="600" cy="600" r="480" opacity="0.22"/>
-    <circle cx="600" cy="600" r="520" opacity="0.18"/>
+    <circle cx="600" cy="600" r="340" opacity="0.62"/>
+    <circle cx="600" cy="600" r="260" opacity="0.50"/>
+    <circle cx="600" cy="600" r="190" opacity="0.44"/>
+    <circle cx="600" cy="600" r="120" opacity="0.36"/>
+
+    <polygon points="600,210 960,840 240,840" opacity="0.42"/>
+    <polygon points="600,300 870,790 330,790" opacity="0.30"/>
+
+    <circle cx="600" cy="600" r="480" opacity="0.28"/>
+    <circle cx="600" cy="600" r="520" opacity="0.22"/>
   </g>
 
-  <g fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1">
-    <path d="M600 80 L600 1120" opacity="0.20"/>
-    <path d="M80 600 L1120 600" opacity="0.20"/>
-    <path d="M220 220 L980 980" opacity="0.14"/>
-    <path d="M980 220 L220 980" opacity="0.14"/>
-  </g>
-</svg>
-"""
-GEOM_DATA_URI = "data:image/svg+xml;utf8," + re.sub(r"\s+", " ", GEOM_SVG).replace("#", "%23")
-
-SUMMARY_WATERMARK_SVG = """
-<svg width="900" height="900" viewBox="0 0 900 900" xmlns="http://www.w3.org/2000/svg">
-  <g fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="2">
-    <circle cx="450" cy="450" r="300"/>
-    <circle cx="450" cy="450" r="240" opacity="0.6"/>
-    <circle cx="450" cy="450" r="180" opacity="0.45"/>
-    <polygon points="450,165 690,615 210,615" opacity="0.45"/>
-    <polygon points="450,225 645,590 255,590" opacity="0.25"/>
+  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="1">
+    <path d="M600 80 L600 1120" opacity="0.25"/>
+    <path d="M80 600 L1120 600" opacity="0.25"/>
+    <path d="M220 220 L980 980" opacity="0.18"/>
+    <path d="M980 220 L220 980" opacity="0.18"/>
   </g>
 </svg>
 """
-SUMMARY_WM_URI = "data:image/svg+xml;utf8," + re.sub(r"\s+", " ", SUMMARY_WATERMARK_SVG).replace("#", "%23")
 
-# NEW: two-layer overlay (same SVG used twice; CSS differentiates layers)
+GEOM_DATA_URI = "data:image/svg+xml;base64," + base64.b64encode(GEOM_SVG.encode("utf-8")).decode("utf-8")
+
 st.markdown(
     f"""
 <div class="aa-geom-wrap">
@@ -394,6 +385,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
 
 
 # =========================================================
