@@ -196,16 +196,6 @@ button, .stButton>button,
   backdrop-filter: blur(8px);
 }
 
-/* Summary watermark only behind summary section */
-.aa-summary-watermark {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.12;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 650px 650px;
-}
 
 /* Cyan slider styling (Streamlit/BaseWeb - strong) */
 [data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"]{
@@ -1240,10 +1230,7 @@ if generate_clicked:
 # =========================================================
 if "progressions" in st.session_state and st.session_state.get("zip_path"):
 
-    st.markdown(
-        f"<div class='aa-summary-watermark' style=\"background-image:url('{SUMMARY_WM_URI}');\"></div>",
-        unsafe_allow_html=True
-    )
+    
 
     a, b = st.columns(2)
     a.metric("Progressions Generated", int(st.session_state.get("progression_count", 0)))
