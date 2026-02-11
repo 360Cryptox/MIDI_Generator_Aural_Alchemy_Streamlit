@@ -134,28 +134,30 @@ button, .stButton>button,
 }
   
 .aa-edition{
-  margin-top: 14px;
-
+  margin-top: 10px;
+  display: inline-block;                 /* important */
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 6px;
   text-transform: uppercase;
 
-  opacity: 0.85;
-
   background: linear-gradient(
     90deg,
-    rgba(255,255,255,0.85),
-    rgba(0,229,255,0.85),
-    rgba(255,215,0,0.85)
+    rgba(255,255,255,0.92),
+    rgba(0,229,255,0.95),
+    rgba(255,215,0,0.92)
   );
 
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;  /* THIS is the missing piece */
 
+  opacity: 1;                            /* don’t fade it or it looks like subtitle */
+  text-shadow: 0 10px 24px rgba(0,0,0,0.45);
   position: relative;
 }
+
 
 /* subtle thin line under it (cinematic touch) */
 .aa-edition::after{
