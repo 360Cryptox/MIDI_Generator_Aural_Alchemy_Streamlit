@@ -1,5 +1,7 @@
 # requirements.txt
-streamlit==1.37.1
-pretty_midi==0.2.10
-pandas==2.2.2
-numpy==2.0.2
+streamlit
+pretty_midi
+mido
+numpy
+pandas
+
