@@ -1076,12 +1076,12 @@ with sp_center:
         min_value=1,
         max_value=100,
         value=10,
-        help="Generates a balanced mix of 4, 8, and 16-bar loops."
+        help="Generates a balanced mix of 4, 8, and 16-bar chord loops in different keys."
     )
     revoice = st.toggle(
         "Re-Voicing",
         value=False,
-        help="Smooth voicings + inversions for a more premium, musical feel."
+        help="Smooth voicings + inversions for a more original feel."
     )
 
 btn_left, btn_center, btn_right = st.columns([1, 2, 1])
