@@ -224,6 +224,18 @@ div[data-baseweb="toggle"] input:checked + div{
 /* Reduce top whitespace */
 .block-container { padding-top: 1.0rem !important; }
 
+/* === FORCE SLIDER TRACK COLORS (kill orange) === */
+[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] div{
+  background: rgba(0,229,255,0.55) !important;          /* filled track */
+}
+[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] div:last-child{
+  background: rgba(255,255,255,0.10) !important;        /* remaining track */
+}
+[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"]{
+  background: transparent !important;
+}
+
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -1082,35 +1094,35 @@ st.markdown("</div>", unsafe_allow_html=True)
 # RUN GENERATION
 # =========================================================
 if generate_clicked:
-    with st.status("Generating progressions…", expanded=False) as status:
-        try:
+    try:
+        with st.spinner("Generating progressions…"):
             seed = int(np.random.randint(1, 2_000_000_000))
 
-            status.update(label="Composing progressions…", state="running")
             progressions, pattern_dupe_used, pattern_dupe_max, low_sim_total, qual_usage = generate_progressions(
                 n=int(n_progressions),
                 seed=seed
             )
 
+            # Hard guarantee: low-sim must be zero
             if low_sim_total != 0:
                 raise RuntimeError("Safety check failed: low-sim transitions detected.")
 
-            status.update(label="Exporting MIDI + chords…", state="running")
             zip_path, chord_count = build_pack(progressions, revoice=bool(revoice))
 
+            # Store in session
             st.session_state.progressions = progressions
             st.session_state.zip_path = zip_path
             st.session_state.progression_count = len(progressions)
             st.session_state.chord_count = chord_count
 
-            status.update(label="Ready.", state="complete")
+        st.success("Ready.")
+    except Exception as e:
+        st.session_state.pop("zip_path", None)
+        st.session_state.pop("progressions", None)
+        st.session_state.progression_count = 0
+        st.session_state.chord_count = 0
+        st.error(f"Error: {e}")
 
-        except Exception as e:
-            st.session_state.pop("zip_path", None)
-            st.session_state.pop("progressions", None)
-            st.session_state.progression_count = 0
-            st.session_state.chord_count = 0
-            st.error(f"Error: {e}")
 
 # =========================================================
 # SUMMARY + DOWNLOAD + TABLE
