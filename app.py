@@ -44,6 +44,22 @@ st.markdown(
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap');
 
+/* FORCE STREAMLIT THEME PRIMARY COLOR (affects slider fill + toggle ON) */
+:root {
+  --primary-color: #00E5FF !important;
+  --primaryColor: #00E5FF !important;            /* some builds */
+  --primary-color-light: rgba(0,229,255,0.35) !important;
+}
+
+/* Streamlit containers sometimes hold the vars instead of :root */
+[data-testid="stAppViewContainer"],
+[data-testid="stHeader"],
+.stApp {
+  --primary-color: #00E5FF !important;
+  --primaryColor: #00E5FF !important;
+}
+
+
 html, body, [class*="css"], .stApp, .block-container,
 h1, h2, h3, h4, h5, h6,
 p, span, div, label,
@@ -266,51 +282,6 @@ div[data-baseweb="toggle"] input:checked + div{
 div[data-testid="stMarkdownContainer"] > p:empty {
   display: none !important;
 }
-/* =========================
-   FORCE CYAN SLIDER (TRACK + FILL + THUMB)
-   ========================= */
-
-/* filled portion */
-div[data-baseweb="slider"] div[role="presentation"] > div:nth-child(1) {
-  background: rgba(0,229,255,0.65) !important;
-  box-shadow: 0 0 18px rgba(0,229,255,0.25) !important;
-}
-
-/* remaining portion */
-div[data-baseweb="slider"] div[role="presentation"] > div:nth-child(2) {
-  background: rgba(255,255,255,0.10) !important;
-}
-
-/* sometimes Streamlit nests the actual bars one level deeper */
-div[data-baseweb="slider"] div[role="presentation"] > div:nth-child(1) div {
-  background: rgba(0,229,255,0.65) !important;
-}
-div[data-baseweb="slider"] div[role="presentation"] > div:nth-child(2) div {
-  background: rgba(255,255,255,0.10) !important;
-}
-
-/* value text above thumb */
-div[data-baseweb="slider"] [data-testid="stTickBar"] ~ div span,
-div[data-baseweb="slider"] span {
-  color: rgba(0,229,255,0.95) !important;
-}
-
-/* =========================
-   FORCE CYAN TOGGLE (ON STATE)
-   ========================= */
-
-div[data-baseweb="toggle"] input:checked + div {
-  background: rgba(0,229,255,0.45) !important; /* the pill */
-  border: 1px solid rgba(0,229,255,0.55) !important;
-  box-shadow: 0 0 18px rgba(0,229,255,0.55) !important;
-}
-
-/* the toggle knob */
-div[data-baseweb="toggle"] input:checked + div > div {
-  background: rgba(220,255,255,0.95) !important;
-  box-shadow: 0 0 16px rgba(0,229,255,0.35) !important;
-}
-
 
 
 
