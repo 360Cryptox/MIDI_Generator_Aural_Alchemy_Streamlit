@@ -100,7 +100,7 @@ button, .stButton>button,
   inset: -18%;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: min(900px, 85vw) min(900px, 85vw);
+  background-size: min(1200px, 90vw) min(1200px, 90vw);
   will-change: transform, opacity;
 
   transform: translateZ(0);
