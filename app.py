@@ -366,9 +366,7 @@ GEOM_SVG = """
     988,810
     212,810
   "
-  fill="none"
-  stroke="url(#g1)"
-  stroke-width="2"
+  
 />
 
     
