@@ -131,7 +131,9 @@ button, .stButton>button,
   background-clip: text;
   color: transparent;
   text-shadow: 0 12px 30px rgba(0,0,0,0.55);
-  .aa-edition{
+}
+  
+.aa-edition{
   margin-top: 14px;
 
   font-size: 13px;
