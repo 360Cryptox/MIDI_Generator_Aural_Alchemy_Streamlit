@@ -360,7 +360,7 @@ GEOM_SVG = """
     <circle cx="600" cy="600" r="190" opacity="0.44"/>
     <circle cx="600" cy="600" r="120" opacity="0.36"/>
 
-    <polygon points="600,220 929.1,790 270.9,790" opacity="0.58"/>
+    <polygon points="600,220 929.1,790 270.9,790" opacity="0.90"/>
 
 
     
