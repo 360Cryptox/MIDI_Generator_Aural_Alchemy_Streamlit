@@ -235,6 +235,33 @@ div[data-baseweb="toggle"] input:checked + div{
 [data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"]{
   background: transparent !important;
 }
+.aa-ready-wrap{
+  display:flex;
+  justify-content:center;
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+.aa-ready-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 0.9px;
+  font-size: 13px;
+}
+.aa-ready-dot{
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background: rgba(0,229,255,0.95);
+  box-shadow: 0 0 18px rgba(0,229,255,0.60);
+}
 
 
 </style>
@@ -1116,7 +1143,15 @@ if generate_clicked:
             st.session_state.progression_count = len(progressions)
             st.session_state.chord_count = chord_count
 
-        st.success("Ready.")
+        st.markdown(
+    """
+    <div class="aa-ready-wrap">
+      <div class="aa-ready-badge"><span class="aa-ready-dot"></span>READY</div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
     except Exception as e:
         st.session_state.pop("zip_path", None)
         st.session_state.pop("progressions", None)
