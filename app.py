@@ -100,7 +100,7 @@ button, .stButton>button,
   inset: -18%;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: min(1200px, 90vw) min(1200px, 90vw);
+  background-size: min(1000px, 85vw) min(1000px, 85vw);
   will-change: transform, opacity;
 
   transform: translateZ(0);
@@ -360,14 +360,8 @@ GEOM_SVG = """
     <circle cx="600" cy="600" r="190" opacity="0.44"/>
     <circle cx="600" cy="600" r="120" opacity="0.36"/>
 
-    <polygon 
-  points="
-    600,180
-    988,810
-    212,810
-  "
-  
-/>
+    <polygon points="600,220 929.1,790 270.9,790" opacity="0.35"/>
+
 
     
 
