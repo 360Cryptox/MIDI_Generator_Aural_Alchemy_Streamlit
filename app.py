@@ -134,6 +134,7 @@ button, .stButton>button,
   backdrop-filter: blur(8px);
 }
 
+
 /* Summary watermark only behind summary section */
 .aa-summary-watermark {
   position: absolute;
@@ -262,6 +263,10 @@ div[data-baseweb="toggle"] input:checked + div{
   background: rgba(0,229,255,0.95);
   box-shadow: 0 0 18px rgba(0,229,255,0.60);
 }
+div[data-testid="stMarkdownContainer"] > p:empty {
+  display: none !important;
+}
+
 
 
 </style>
