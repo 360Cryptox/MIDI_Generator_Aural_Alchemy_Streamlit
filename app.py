@@ -149,17 +149,27 @@ button, .stButton>button,
   margin-bottom: 26px;
 }
 .aa-title {
-  font-size: 46px;
+  font-size: clamp(30px, 7vw, 46px);
   font-weight: 700;
-  letter-spacing: 3.2px !important;
+  letter-spacing: clamp(1px, 0.6vw, 3.2px);
   line-height: 1.05;
   margin: 0;
   padding: 0;
-  background: linear-gradient(90deg, rgba(255,255,255,0.98), rgba(0,229,255,0.90), rgba(255,215,0,0.92));
+  white-space: normal;
+  word-break: keep-all;
+
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.98),
+    rgba(0,229,255,0.90),
+    rgba(255,215,0,0.92)
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   text-shadow: 0 12px 30px rgba(0,0,0,0.55);
+}
+
 }
 .aa-subtitle {
   margin-top: 8px;
