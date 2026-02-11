@@ -31,7 +31,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-APP_TITLE = "AURAL ALCHEMY - MIDI GENERATOR"
+APP_TITLE = "AURAL ALCHEMY GENERATOR"
 APP_SUBTITLE = "Endless Ambient MIDI Progressions Ready To Drop Into Any DAW"
 DOWNLOAD_NAME = "MIDI_Progressions_Aural_Alchemy.zip"
 
