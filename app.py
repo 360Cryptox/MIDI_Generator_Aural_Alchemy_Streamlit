@@ -94,7 +94,7 @@ button, .stButton>button,
   opacity: 0.90; /* overall container strength */
 }
 
-.aa-geom-1,
+
 .aa-geom-2{
   position: absolute;
   inset: -18%;
@@ -112,11 +112,7 @@ button, .stButton>button,
 
 
 /* Layer 1: crisp lines, slow spin */
-.aa-geom-1{
-  opacity: 0.28;
-  filter: blur(0.2px) drop-shadow(0 0 24px rgba(0,229,255,0.12));
-  animation: aaSpin1 180s linear infinite;
-}
+
 
 /* Layer 2: softer glow, reverse spin + subtle breathing */
 .aa-geom-2{
