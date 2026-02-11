@@ -1128,7 +1128,7 @@ if generate_clicked:
 # SUMMARY + DOWNLOAD + TABLE
 # =========================================================
 if "progressions" in st.session_state and st.session_state.get("zip_path"):
-    st.markdown('<div class="aa-panel" style="position:relative;">', unsafe_allow_html=True)
+    
     st.markdown(
         f"<div class='aa-summary-watermark' style=\"background-image:url('{SUMMARY_WM_URI}');\"></div>",
         unsafe_allow_html=True
