@@ -1070,20 +1070,31 @@ st.markdown(
 # =========================================================
 
 
+# Center controls
 sp_left, sp_center, sp_right = st.columns([1, 2, 1])
+
 with sp_center:
+    st.markdown("<div class='aa-center-label'>Progressions to Generate</div>", unsafe_allow_html=True)
+
     n_progressions = st.slider(
         "Progressions to Generate",
         min_value=1,
         max_value=100,
         value=10,
-        help="Generates a balanced mix of 4, 8, and 16-bar chord loops in different keys."
+        label_visibility="collapsed"
     )
-    revoice = st.toggle(
-        "Re-Voicing",
-        value=False,
-        help="Smooth voicings + inversions for a more original feel."
-    )
+
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+    # Centered toggle row
+    t_left, t_mid, t_right = st.columns([1, 1, 1])
+    with t_mid:
+        revoice = st.toggle(
+            "Re-Voicing",
+            value=False,
+            help="Smooth voicings + inversions for a more premium, musical feel."
+        )
+
 
 btn_left, btn_center, btn_right = st.columns([1, 2, 1])
 with btn_center:
