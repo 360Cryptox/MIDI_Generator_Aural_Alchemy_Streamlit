@@ -115,14 +115,14 @@ button, .stButton>button,
 .aa-geom-1{
   opacity: 0.28;
   filter: blur(0.2px) drop-shadow(0 0 24px rgba(0,229,255,0.12));
-  animation: aaSpin1 110s linear infinite;
+  animation: aaSpin1 180s linear infinite;
 }
 
 /* Layer 2: softer glow, reverse spin + subtle breathing */
 .aa-geom-2{
   opacity: 0.18;
   filter: blur(0.9px) drop-shadow(0 0 36px rgba(255,215,0,0.10));
-  animation: aaSpin2 130s linear infinite, aaBreathe 8.5s ease-in-out infinite;
+  animation: aaSpin2 200s linear infinite, aaBreathe 8.5s ease-in-out infinite;
 }
 
 @keyframes aaSpin1{
