@@ -334,6 +334,11 @@ div[data-testid="stMarkdownContainer"] > p:empty {
 [data-baseweb="toggle"] div[aria-checked="true"] > div{
   background-color: #00E5FF !important;
 }
+/* Add breathing room below Streamlit top bar */
+.block-container {
+  padding-top: 3.5rem !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
