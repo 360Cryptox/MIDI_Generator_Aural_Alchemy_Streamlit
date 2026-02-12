@@ -279,6 +279,12 @@ div[data-baseweb="toggle"] input:checked + div{
 }
 @keyframes shimmer { 100% { left: 140%; } }
 
+/* Target ONLY the Reset button by its key */
+button[kind="secondary"][data-testid="baseButton-secondary"]:has(span:contains("Reset to Default")) {
+  white-space: nowrap !important;
+}
+
+
 /* Metrics */
 [data-testid="stMetric"] {
   border-radius: 16px !important;
@@ -1398,12 +1404,12 @@ with sp_center:
 
         with st.expander("ADVANCED SETTINGS", expanded=False):
             st.caption("Chord type balance: 0 disables. 50 is default. 100 strongly favors.")
-
-            st.markdown('<div class="aa-reset-wrap">', unsafe_allow_html=True)
-            if st.button("Reset to Default", use_container_width=False, key="aa_reset_defaults"):
-                reset_adv_defaults()
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        
+            cL, cM, cR = st.columns([1, 2, 1])
+            with cM:
+                if st.button("Reset to Default", use_container_width=True, key="aa_reset_defaults"):
+                    reset_adv_defaults()
+                    st.rerun()
 
             st.markdown("### MAJOR FAMILY")
             c1, c2 = st.columns(2)
