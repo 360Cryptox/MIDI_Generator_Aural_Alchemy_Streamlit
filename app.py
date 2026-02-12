@@ -1232,10 +1232,30 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
             prev_v = v
             prev_name = ch_name
 
+        # Enforce semitone-resolution rule on the loop edge (last -> first)
+        if len(chords) >= 2:
+            voiced[0] = choose_best_voicing(
+                voiced[-1],
+                chords[-1],
+                chords[0],
+                raw[0],
+                key_name,
+                rng
+            )
+
+            # Re-stabilize chord 2 after chord 1 potentially changed
+            voiced[1] = choose_best_voicing(
+                voiced[0],
+                chords[0],
+                chords[1],
+                raw[1],
+                key_name,
+                rng
+            )
+
         out_notes = voiced
     else:
         out_notes = raw
-
 
     t = 0.0
     for notes, bars in zip(out_notes, durations):
@@ -1256,10 +1276,10 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
     os.makedirs(out_dir, exist_ok=True)
 
     rv_tag = "_Revoice" if revoice else ""
-
     filename = f"Prog_{idx:03d}_in_{safe_token(key_name)}_{chord_list_token(chords)}{rv_tag}.mid"
 
     midi.write(os.path.join(out_dir, filename))
+
 
 
 def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, length_bars=4):
