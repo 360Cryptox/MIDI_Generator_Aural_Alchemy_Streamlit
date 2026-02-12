@@ -1248,7 +1248,7 @@ def choose_best_voicing(
         if sp > MAX_SPAN:
             span_pen += (sp - MAX_SPAN) * 220
 
-        move_pen = 0 if prev_voicing is None else total_move(prev_voicing, v) * 7
+        move_pen = 0 if prev_voicing is None else total_move(prev_voicing, v) * 3
         repeat_pen = 2500 if (prev_voicing is not None and sorted(prev_voicing) == v) else 0
 
         shared_pen = 0
