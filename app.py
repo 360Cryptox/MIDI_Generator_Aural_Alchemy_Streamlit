@@ -1329,11 +1329,15 @@ def build_pack(progressions, revoice: bool) -> tuple[str, int]:
         zip_name += "_Revoice"
     zip_name += ".zip"
 
-    zip_path = os.path.join(workdir, zip_name)
+    zip_name = DOWNLOAD_NAME
+    if revoice and zip_name.lower().endswith(".zip"):
+        zip_name = zip_name[:-4] + "_Revoice.zip"
 
+    zip_path = os.path.join(workdir, zip_name)
     zip_pack(prog_root, zip_path)
 
     return zip_path, len(unique_chords)
+
 
 
 # =========================================================
