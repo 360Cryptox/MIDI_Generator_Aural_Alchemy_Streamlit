@@ -1208,29 +1208,29 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
         # Create a local RNG for voicing behavior
         rng = random.Random()
 
-    for ch_name, notes in zip(chords, raw):
-        if prev_v is None:
-            v = choose_best_voicing(
-                None,
-                ch_name,
-                ch_name,
-                notes,
-                key_name,
-                rng
-            )
-        else:
-            v = choose_best_voicing(
-                prev_v,
-                prev_name,
-                ch_name,
-                notes,
-                key_name,
-                rng
-            )
+        for ch_name, notes in zip(chords, raw):
+            if prev_v is None:
+                v = choose_best_voicing(
+                    None,
+                    ch_name,
+                    ch_name,
+                    notes,
+                    key_name,
+                    rng
+                )
+            else:
+                v = choose_best_voicing(
+                    prev_v,
+                    prev_name,
+                    ch_name,
+                    notes,
+                    key_name,
+                    rng
+                )
 
-        voiced.append(v)
-        prev_v = v
-        prev_name = ch_name
+            voiced.append(v)
+            prev_v = v
+            prev_name = ch_name
 
         out_notes = voiced
     else:
