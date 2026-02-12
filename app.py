@@ -1266,7 +1266,19 @@ def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, lengt
     inst = pretty_midi.Instrument(program=0)
 
     raw = chord_to_midi(chord_name, base_oct=BASE_OCTAVE)
-    notes = choose_best_voicing(None, chord_name, chord_name, raw, "C", rng) if revoice else raw
+    if revoice:
+        rng = random.Random()
+        notes = choose_best_voicing(
+            None,
+            chord_name,
+            chord_name,
+            raw,
+            "C",   # key irrelevant here since prev_voicing is None
+            rng
+        )
+    else:
+        notes = raw
+
 
     for p in sorted(set(notes)):
         inst.notes.append(pretty_midi.Note(
