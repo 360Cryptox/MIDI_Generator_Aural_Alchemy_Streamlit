@@ -516,15 +516,15 @@ MIN_SHARED_TONES = 1
 ENFORCE_LOOP_OK = True
 MAX_TRIES_PER_PROG = 40000
 
-TRIAD_PROB_BASE = 0.90
+TRIAD_PROB_BASE = 0.30
 BARE_SUS_PROB = 0.13
 
 SUS_WEIGHT_MULT = 0.50
-SUS_UPGRADE_PROB = 0.50
+SUS_UPGRADE_PROB = 0
 
-MAJ_POOL_BASE = [("maj9", 10), ("maj7", 9), ("add9", 7), ("6add9", 6), ("6", 4), ("maj", 2)]
-MIN_POOL_BASE = [("min9", 10), ("min7", 9), ("min11", 4), ("min", 2)]
-SUS_POOL_BASE = [("sus2add9", 10), ("sus4add9", 10), ("sus2", 2), ("sus4", 2)]
+MAJ_POOL_BASE = [("maj9", 10), ("maj7", 9), ("add9", 7), ("6add9", 5), ("6", 4), ("maj", 4)]
+MIN_POOL_BASE = [("min9", 10), ("min7", 9), ("min11", 4), ("min", 4)]
+SUS_POOL_BASE = [("sus2add9", 2), ("sus4add9", 2), ("sus2", 2), ("sus4", 2)]
 
 
 def _scaled_pool(pool, mult):
