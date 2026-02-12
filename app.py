@@ -766,6 +766,105 @@ def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int
     if not _shared_tone_ok_loop(roots, quals, need=MIN_SHARED_TONES, loop=True):
         return None
 
+    # =========================================================
+    # SUS SAFETY SYSTEM (default + sus-heavy mode)
+    # - Default mode keeps sus tasteful and avoids random sus fog
+    # - Sus-heavy mode activates when user boosts sus sliders, allowing 100% sus
+    #   while enforcing strong overlap and musical root movement
+    # =========================================================
+
+    # detect sus-heavy mode from chord_balance sliders (0..100)
+    sus_keys = ["sus2", "sus4", "sus2add9", "sus4add9"]
+    avg_sus_weight = 1.0
+    if chord_balance:
+        vals = [_balance_factor(chord_balance.get(k, ADV_DEFAULT_VALUE)) for k in sus_keys]
+        avg_sus_weight = sum(vals) / len(vals)
+    sus_heavy = avg_sus_weight >= 1.35
+
+    def is_sus(q: str) -> bool:
+        return q.startswith("sus")
+
+    def is_sus4ish(q: str) -> bool:
+        return q.startswith("sus4")
+
+    def pc_interval(a: int, b: int) -> int:
+        iv = abs((b - a) % 12)
+        return min(iv, 12 - iv)
+
+    m = len(quals)
+    sus_count = sum(1 for q in quals if is_sus(q))
+    sus4_count = sum(1 for q in quals if is_sus4ish(q))
+
+    pcs = [_chord_pc_set_real(r, q) for r, q in zip(roots, quals)]
+    root_pcs = [_pc(r) for r in roots]
+
+    # Default mode constraints
+    DEFAULT_SUS_MAX_RATIO = 0.45    # max 45% of chords in a progression can be sus
+    DEFAULT_SUS4_MAX_COUNT = 1      # only 1 sus4/sus4add9 per progression
+    DEFAULT_NEED_IF_SUS = 2         # shared tones when either chord is sus*
+    DEFAULT_NEED_IF_SUS4 = 3        # shared tones when either chord is sus4*
+
+    # Sus-heavy constraints
+    HEAVY_NEED = 2                  # baseline shared tones
+    HEAVY_NEED_IF_SUS4 = 3          # stricter when sus4 involved
+    HEAVY_REQUIRE_STEP_OR_REPEAT = True
+
+    # Allow sus4 -> sus4 only if "safe":
+    # shared >= 3 OR stepwise root motion (<=2 semitones) OR same root
+    ALLOW_SUS4_TO_SUS4_IF_SAFE = True
+
+    if not sus_heavy:
+        if sus_count / max(1, m) > DEFAULT_SUS_MAX_RATIO:
+            return None
+        if sus4_count > DEFAULT_SUS4_MAX_COUNT:
+            return None
+
+    step_moves = 0
+    has_repeat_root = (len(set(root_pcs)) < len(root_pcs))
+
+    for i in range(m):
+        j = (i + 1) % m  # includes loop-back
+
+        shared = len(pcs[i] & pcs[j])
+        iv = pc_interval(root_pcs[i], root_pcs[j])
+
+        if iv <= 2:
+            step_moves += 1
+
+        if sus_heavy:
+            need = HEAVY_NEED
+            if is_sus4ish(quals[i]) or is_sus4ish(quals[j]):
+                need = max(need, HEAVY_NEED_IF_SUS4)
+            if shared < need:
+                return None
+
+            if is_sus4ish(quals[i]) and is_sus4ish(quals[j]):
+                if ALLOW_SUS4_TO_SUS4_IF_SAFE:
+                    if not (shared >= 3 or iv <= 2 or roots[i] == roots[j]):
+                        return None
+                else:
+                    return None
+
+        else:
+            need = 1
+            if is_sus(quals[i]) or is_sus(quals[j]):
+                need = DEFAULT_NEED_IF_SUS
+            if is_sus4ish(quals[i]) or is_sus4ish(quals[j]):
+                need = max(need, DEFAULT_NEED_IF_SUS4)
+            if shared < need:
+                return None
+
+            if is_sus4ish(quals[i]) and is_sus4ish(quals[j]):
+                if ALLOW_SUS4_TO_SUS4_IF_SAFE:
+                    if not (shared >= 3 or iv <= 2 or roots[i] == roots[j]):
+                        return None
+                else:
+                    return None
+
+    if sus_heavy and HEAVY_REQUIRE_STEP_OR_REPEAT:
+        if step_moves == 0 and (not has_repeat_root):
+            return None
+
     if LIMIT_NOTECOUNT_JUMPS:
         big = 0
         for a, b in zip(quals, quals[1:]):
@@ -855,6 +954,7 @@ def generate_progressions(n: int, seed: int, chord_balance: Optional[Dict[str, i
         out.append(built)
 
     return out, pattern_dupe_used, max_pattern_dupes, low_sim_total, qual_usage
+
 
 
 # =========================================================
