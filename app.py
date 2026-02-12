@@ -81,6 +81,26 @@ button, .stButton>button,
   font-family: "Cinzel", serif !important;
   letter-spacing: 0.55px !important;
 }
+/* --- Reset button: perfectly centered and never truncated --- */
+div[data-testid="column"] div[data-testid="stButton"] {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+div[data-testid="column"] div[data-testid="stButton"] > button {
+  width: fit-content !important;
+  min-width: 260px !important;  /* increase if you want it wider */
+  padding-left: 2.2em !important;
+  padding-right: 2.2em !important;
+}
+
+div[data-testid="column"] div[data-testid="stButton"] > button,
+div[data-testid="column"] div[data-testid="stButton"] > button * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
 /* ✅ Restore Streamlit/BaseWeb icon fonts (prevents ARROW_* text showing) */
 [data-baseweb="icon"], 
 [data-baseweb="icon"] *,
@@ -1407,7 +1427,7 @@ with sp_center:
         
             cL, cM, cR = st.columns([1, 2, 1])
             with cM:
-                if st.button("Reset to Default", use_container_width=True, key="aa_reset_defaults"):
+                if st.button("Reset to Default", use_container_width=False, key="aa_reset_defaults"):
                     reset_adv_defaults()
                     st.rerun()
 
