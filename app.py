@@ -125,13 +125,11 @@ svg, svg * {
 }
 .aa-geom-1{
   opacity: 0.20;
-  filter: drop-shadow(0 0 28px rgba(0,229,255,0.10));
-  animation: aaSpin1 240s linear infinite;
+  animation: aaSpin1 600s linear infinite;
 }
 .aa-geom-2{
   opacity: 0.18;
-  filter: blur(0.9px) drop-shadow(0 0 36px rgba(255,215,0,0.10));
-  animation: aaSpin2 200s linear infinite, aaBreathe 8.5s ease-in-out infinite;
+  animation: aaSpin2 560s linear infinite, aaBreathe 8.5s ease-in-out infinite;
 }
 @keyframes aaSpin1{
   0%   { transform: rotate(0deg) scale(1.02); }
@@ -156,7 +154,6 @@ svg, svg * {
   background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
   border: 1px solid rgba(255,255,255,0.10);
   box-shadow: 0 18px 60px rgba(0,0,0,0.45);
-  backdrop-filter: blur(8px);
   text-align: center;
   margin-bottom: 26px;
 }
