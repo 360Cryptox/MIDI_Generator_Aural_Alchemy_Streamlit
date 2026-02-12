@@ -1232,9 +1232,9 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
         prev_v = v
         prev_name = ch_name
 
-    out_notes = voiced
-else:
-    out_notes = raw
+        out_notes = voiced
+    else:
+        out_notes = raw
 
 
     t = 0.0
