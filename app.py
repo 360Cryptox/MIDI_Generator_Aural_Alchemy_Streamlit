@@ -997,10 +997,9 @@ def choose_best_voicing(
     raw_clamped = clamp_to_range(raw_notes)
 
     # Controlled glue: never below C3, above C3 only sometimes
-filtered = [v for v in cands if glue_ok(v, rng)]
-if filtered:
-    cands = filtered
-
+    filtered = [v for v in cands if glue_ok(v, rng)]
+    if filtered:
+        cands = filtered
 
     if ENFORCE_NOT_RAW_WHEN_VOICING:
         non_raw = [v for v in cands if not is_raw_shape(v, raw_clamped)]
