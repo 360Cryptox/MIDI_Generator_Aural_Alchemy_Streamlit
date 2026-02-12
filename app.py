@@ -826,7 +826,7 @@ MAX_SPAN = 19
 MAX_SHARED_DEFAULT = 2
 MAX_SHARED_MIN11 = 3
 
-DISALLOW_GLUE = True
+DISALLOW_GLUE = False
 ENFORCE_NOT_RAW_WHEN_VOICING = True
 
 
@@ -905,6 +905,34 @@ def has_glued_semitones(notes):
     s = sorted(notes)
     return any((s[i + 1] - s[i]) == 1 for i in range(len(s) - 1))
 
+# =====================================
+# Controlled Glue Rule (Aural Alchemy)
+# =====================================
+GLUE_LOW_CUTOFF = 48      # C3
+GLUE_PROBABILITY = 0.30   # chance to allow glue above C3
+
+def semitone_pairs(notes: List[int]):
+    s = sorted(set(notes))
+    pairs = []
+    for i in range(len(s) - 1):
+        if (s[i + 1] - s[i]) == 1:
+            pairs.append((s[i], s[i + 1]))
+    return pairs
+
+def glue_ok(notes: List[int], rng: random.Random) -> bool:
+    pairs = semitone_pairs(notes)
+    if not pairs:
+        return True
+
+    # Never allow any semitone pair below C3
+    for a, b in pairs:
+        if a < GLUE_LOW_CUTOFF or b < GLUE_LOW_CUTOFF:
+            return False
+
+    # Above C3, allow glue only sometimes
+    return rng.random() < GLUE_PROBABILITY
+
+
 
 def shared_pitch_count(a, b):
     return len(set(a) & set(b))
@@ -962,15 +990,17 @@ def choose_best_voicing(
     prev_voicing: Optional[List[int]],
     prev_name: str,
     cur_name: str,
-    raw_notes: List[int]
+    raw_notes: List[int],
+    rng: random.Random
 ) -> List[int]:
     cands = generate_voicing_candidates(raw_notes)
     raw_clamped = clamp_to_range(raw_notes)
 
-    if DISALLOW_GLUE:
-        non_glue = [v for v in cands if not has_glued_semitones(v)]
-        if non_glue:
-            cands = non_glue
+    # Controlled glue: never below C3, above C3 only sometimes
+filtered = [v for v in cands if glue_ok(v, rng)]
+if filtered:
+    cands = filtered
+
 
     if ENFORCE_NOT_RAW_WHEN_VOICING:
         non_raw = [v for v in cands if not is_raw_shape(v, raw_clamped)]
@@ -1070,9 +1100,9 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
         prev_name = chords[0]
         for ch_name, notes in zip(chords, raw):
             if prev_v is None:
-                v = choose_best_voicing(None, ch_name, ch_name, notes)
+                v = choose_best_voicing(None, ch_name, ch_name, notes, random)
             else:
-                v = choose_best_voicing(prev_v, prev_name, ch_name, notes)
+                v = choose_best_voicing(prev_v, prev_name, ch_name, notes, random)
             voiced.append(v)
             prev_v = v
             prev_name = ch_name
@@ -1109,7 +1139,7 @@ def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, lengt
     inst = pretty_midi.Instrument(program=0)
 
     raw = chord_to_midi(chord_name, base_oct=BASE_OCTAVE)
-    notes = choose_best_voicing(None, chord_name, chord_name, raw) if revoice else raw
+    notes = choose_best_voicing(None, chord_name, chord_name, raw, random) if revoice else raw
 
     for p in sorted(set(notes)):
         inst.notes.append(pretty_midi.Note(
