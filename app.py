@@ -193,7 +193,7 @@ button, .stButton>button,
 
 }
 .aa-subtitle {
-  margin-top: 50px;
+  margin-top: 18px;
   font-size: 16px;
   opacity: 0.82;
   letter-spacing: 1.1px !important;
