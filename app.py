@@ -4,7 +4,7 @@
 # - Exports a ZIP containing: Progressions (4/8/16-bar folders) + Individual Chords library
 # - Optional Re-Voicing (inversions/voicing engine)
 # - Premium UI styling (Cinzel font everywhere, cyan slider, gold shimmer button, soft glows)
-# - NEW: slow rotating sacred geometry mandala overlay (two layers)
+# - NEW: Advanced Settings (hidden by default): per-chord-type weight sliders (0..100)
 
 import os
 import re
@@ -84,18 +84,15 @@ button, .stButton>button,
 }
 
 /* =========================================================
-   NEW: SACRED GEOMETRY OVERLAY (two layers + slow rotation)
-   - Keep this ONLY (removed old .aa-geom / aaSlowSpin)
+   SACRED GEOMETRY OVERLAY (two layers + slow rotation)
 ========================================================= */
 .aa-geom-wrap{
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.90; /* overall container strength */
+  opacity: 0.90;
 }
-
-
 .aa-geom-2{
   position: absolute;
   inset: -18%;
@@ -103,35 +100,19 @@ button, .stButton>button,
   background-position: center;
   background-size: min(1000px, 85vw) min(1000px, 85vw);
   will-change: transform, opacity;
-
   transform: translateZ(0);
   backface-visibility: hidden;
   contain: paint;
-
-
 }
-
-
-/* Layer 1: crisp lines, slow spin */
-
-
-/* Layer 2: softer glow, reverse spin + subtle breathing */
 .aa-geom-2{
   opacity: 0.18;
   filter: blur(0.9px) drop-shadow(0 0 36px rgba(255,215,0,0.10));
   animation: aaSpin2 200s linear infinite, aaBreathe 8.5s ease-in-out infinite;
 }
-
-@keyframes aaSpin1{
-  0%   { transform: rotate(0deg) scale(1.02); }
-  100% { transform: rotate(360deg) scale(1.02); }
-}
-
 @keyframes aaSpin2{
   0%   { transform: rotate(0deg) scale(1.04); }
   100% { transform: rotate(-360deg) scale(1.04); }
 }
-
 @keyframes aaBreathe{
   0%, 100% { opacity: 0.16; }
   50%      { opacity: 0.22; }
@@ -184,13 +165,8 @@ button, .stButton>button,
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-}
-.aa-title-second{
   font-size: 38px;
   letter-spacing: 2.5px;
-}
-
-
 }
 .aa-subtitle {
   margin-top: 18px;
@@ -210,7 +186,6 @@ button, .stButton>button,
   box-shadow: 0 18px 60px rgba(0,0,0,0.42);
   backdrop-filter: blur(8px);
 }
-
 
 /* Cyan slider styling (Streamlit/BaseWeb - strong) */
 [data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"]{
@@ -290,7 +265,7 @@ div[data-baseweb="toggle"] input:checked + div{
 }
 
 /* Reduce top whitespace */
-.block-container { padding-top: 1.0rem !important; }
+.block-container { padding-top: 3.5rem !important; }
 
 /* Ready badge */
 .aa-ready-wrap{
@@ -325,39 +300,6 @@ div[data-baseweb="toggle"] input:checked + div{
 div[data-testid="stMarkdownContainer"] > p:empty {
   display: none !important;
 }
-
-/* =========================
-   NUCLEAR: KILL STREAMLIT RED/ORANGE PRIMARY
-========================= */
-[data-testid="stSlider"] * {
-  --primary-color: #00E5FF !important;
-  --primaryColor: #00E5FF !important;
-}
-[data-testid="stSlider"] div[role="slider"]{
-  background-color: #00E5FF !important;
-  border-color: rgba(0,229,255,0.55) !important;
-  box-shadow: 0 0 0 6px rgba(0,229,255,0.10), 0 10px 28px rgba(0,229,255,0.22) !important;
-}
-[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] div{
-  background-color: rgba(0,229,255,0.60) !important;
-  background: rgba(0,229,255,0.60) !important;
-}
-[data-testid="stSlider"] div[data-baseweb="slider"] div[role="presentation"] div:last-child{
-  background-color: rgba(255,255,255,0.12) !important;
-  background: rgba(255,255,255,0.12) !important;
-}
-[data-baseweb="toggle"] div[aria-checked="true"]{
-  background-color: rgba(0,229,255,0.55) !important;
-  box-shadow: 0 0 18px rgba(0,229,255,0.45) !important;
-}
-[data-baseweb="toggle"] div[aria-checked="true"] > div{
-  background-color: #00E5FF !important;
-}
-/* Add breathing room below Streamlit top bar */
-.block-container {
-  padding-top: 3.5rem !important;
-}
-
 </style>
 """,
     unsafe_allow_html=True,
@@ -365,7 +307,7 @@ div[data-testid="stMarkdownContainer"] > p:empty {
 
 
 # =========================================================
-# Geometry SVG overlay (BASE64 DATA URI)  ✅ reliable
+# Geometry SVG overlay (BASE64 DATA URI)
 # =========================================================
 GEOM_SVG = """
 <svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
@@ -386,9 +328,6 @@ GEOM_SVG = """
 
     <polygon points="600,220 929.1,790 270.9,790" opacity="0.90"/>
 
-
-    
-
     <circle cx="600" cy="600" r="480" opacity="0.28"/>
     <circle cx="600" cy="600" r="520" opacity="0.22"/>
   </g>
@@ -401,7 +340,6 @@ GEOM_SVG = """
   </g>
 </svg>
 """
-
 GEOM_DATA_URI = "data:image/svg+xml;base64," + base64.b64encode(GEOM_SVG.encode("utf-8")).decode("utf-8")
 
 st.markdown(
@@ -413,7 +351,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
 
 
 # =========================================================
@@ -509,7 +446,7 @@ def _wchoice(rng: random.Random, items_with_w):
 
 
 # =========================================================
-# GENERATOR SETTINGS (pack-balanced; UI only exposes N + revoicing)
+# GENERATOR SETTINGS
 # =========================================================
 EXPORT_TXT = False
 EXPORT_PY_TXT = False
@@ -560,6 +497,36 @@ SAFE_FALLBACK_ORDER = [
     "maj","min",
     "sus2add9","sus4add9","sus2","sus4"
 ]
+
+# =========================================================
+# NEW: ADVANCED SETTINGS — per-quality weight multipliers
+# =========================================================
+ALL_QUALITIES = list(QUAL_TO_INTERVALS.keys())
+
+def slider_to_mult(v: int) -> float:
+    """
+    Map slider 0..100 to a multiplier:
+    0   -> 0.0 (disabled)
+    50  -> 1.0 (default)
+    100 -> 2.5 (strong preference)
+    """
+    v = int(v)
+    if v <= 0:
+        return 0.0
+    return 0.5 + (v / 100.0) * 2.0
+
+def build_quality_mult_from_sliders(slider_vals: dict) -> dict:
+    return {q: slider_to_mult(slider_vals.get(q, 50)) for q in ALL_QUALITIES}
+
+def apply_quality_mult(pool, qmult: dict):
+    out = []
+    for q, w in pool:
+        m = float(qmult.get(q, 1.0))
+        w2 = w * m
+        if w2 > 1e-12:
+            out.append((q, w2))
+    return out
+
 
 TEMPLATES_BY_LEN = {
     2: [((0,3), 10), ((0,5), 7), ((5,3), 5), ((3,0), 4), ((0,4), 3)],
@@ -622,10 +589,16 @@ def _pattern_fingerprint(degs, quals):
     return (tuple(degs), tuple(quals))
 
 
-def _pick_quality_diatonic(rng: random.Random, key: str, deg: int) -> str:
+def _pick_quality_diatonic(rng: random.Random, key: str, deg: int, qmult: dict) -> str:
     root = SCALES[key][deg]
     triad_boost = (rng.random() < TRIAD_PROB_BASE)
-    pool = DEG_ALLOWED_BASE[deg]
+
+    base_pool = DEG_ALLOWED_BASE[deg]
+    pool = apply_quality_mult(base_pool, qmult)
+
+    # If user disabled everything for this degree, ignore multipliers for this pick
+    if not pool:
+        pool = base_pool[:]
 
     for _ in range(200):
         q = _wchoice(rng, pool)
@@ -640,9 +613,18 @@ def _pick_quality_diatonic(rng: random.Random, key: str, deg: int) -> str:
         if _is_diatonic_chord(key, root, q):
             return q
 
+    # Prefer enabled fallbacks
+    for q in SAFE_FALLBACK_ORDER:
+        if qmult.get(q, 1.0) <= 0:
+            continue
+        if _is_diatonic_chord(key, root, q):
+            return q
+
+    # Absolute fallback if user disabled literally everything
     for q in SAFE_FALLBACK_ORDER:
         if _is_diatonic_chord(key, root, q):
             return q
+
     return "maj7"
 
 
@@ -706,8 +688,8 @@ def _dedupe_inside_progression(rng: random.Random, key: str, degs: list, quals: 
     return degs, quals
 
 
-def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int):
-    quals = [_pick_quality_diatonic(rng, key, d) for d in degs]
+def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int, qmult: dict):
+    quals = [_pick_quality_diatonic(rng, key, d, qmult) for d in degs]
 
     ded = _dedupe_inside_progression(rng, key, degs[:], quals[:])
     if ded is None:
@@ -755,7 +737,7 @@ def _pick_keys_even(n: int, rng: random.Random) -> list:
     return out
 
 
-def generate_progressions(n: int, seed: int):
+def generate_progressions(n: int, seed: int, qmult: dict):
     rng = random.Random(seed)
     keys = _pick_keys_even(n, rng)
 
@@ -777,7 +759,7 @@ def generate_progressions(n: int, seed: int):
             total_bars, m = _pick_valid_total_and_m(rng)
             degs = _pick_template_degs(rng, m)
 
-            res = _build_progression(rng, key, degs, total_bars)
+            res = _build_progression(rng, key, degs, total_bars, qmult=qmult)
             if res is None:
                 continue
 
@@ -826,20 +808,12 @@ MAX_SPAN = 19
 MAX_SHARED_DEFAULT = 2
 MAX_SHARED_MIN11 = 3
 
-# Old switch no longer used for glue logic (kept for compatibility)
 DISALLOW_GLUE = False
 ENFORCE_NOT_RAW_WHEN_VOICING = True
 
-# =====================================
-# Controlled Glue Rule (Aural Alchemy)
-# =====================================
 GLUE_LOW_CUTOFF = 48      # C3
 GLUE_PROBABILITY = 0.30   # chance to allow glue above C3
 
-# =====================================
-# Cross-chord semitone resolution options
-# Tonic always allowed. Third/fifth optional.
-# =====================================
 ALLOW_RESOLVE_TO_THIRD = True
 ALLOW_RESOLVE_TO_FIFTH = False
 
@@ -915,11 +889,6 @@ def center(notes):
     return (min(notes) + max(notes)) / 2.0
 
 
-def has_glued_semitones(notes):
-    s = sorted(notes)
-    return any((s[i + 1] - s[i]) == 1 for i in range(len(s) - 1))
-
-
 def semitone_pairs(notes: List[int]):
     s = sorted(set(notes))
     pairs = []
@@ -933,13 +902,9 @@ def glue_ok(notes: List[int], rng: random.Random) -> bool:
     pairs = semitone_pairs(notes)
     if not pairs:
         return True
-
-    # Never allow any semitone pair below C3
     for a, b in pairs:
         if a < GLUE_LOW_CUTOFF or b < GLUE_LOW_CUTOFF:
             return False
-
-    # Above C3, allow glue only sometimes
     return rng.random() < GLUE_PROBABILITY
 
 
@@ -995,34 +960,20 @@ def generate_voicing_candidates(raw_notes):
     return out if out else [base]
 
 
-# =====================================
-# Cross-chord semitone rule (key-aware)
-# Adjacent semitones between chords are ONLY allowed
-# if the CURRENT note resolves into tonic, and optionally 3rd/5th.
-# =====================================
-
 def allowed_resolution_pcs(key: str) -> set:
-    # Tonic always allowed
     pcs = set()
     tonic = NOTE_TO_PC[SCALES[key][0]]
     pcs.add(tonic)
-
     if ALLOW_RESOLVE_TO_THIRD:
         third = NOTE_TO_PC[SCALES[key][2]]
         pcs.add(third)
-
     if ALLOW_RESOLVE_TO_FIFTH:
         fifth = NOTE_TO_PC[SCALES[key][4]]
         pcs.add(fifth)
-
     return pcs
 
 
 def bad_cross_semitone_indices(prev_notes: List[int], cur_notes: List[int], allowed_target_pcs: set) -> List[int]:
-    """
-    Indices in cur_notes that are ±1 semitone away from ANY note in prev_notes,
-    where the cur note PC is NOT an allowed resolution target.
-    """
     prev_set = set(prev_notes)
     cur = list(cur_notes)
     bad = []
@@ -1034,10 +985,6 @@ def bad_cross_semitone_indices(prev_notes: List[int], cur_notes: List[int], allo
 
 
 def repair_cross_semitones(prev_notes: List[int], cur_notes: List[int], allowed_target_pcs: set, max_iters: int = 8) -> List[int]:
-    """
-    Fix bad cross-chord semitone adjacencies by octave-shifting ONLY offending notes.
-    No chord changes, only ±12 moves within LOW/HIGH and avoiding duplicate pitches.
-    """
     v = sorted(list(cur_notes))
 
     for _ in range(max_iters):
@@ -1048,7 +995,6 @@ def repair_cross_semitones(prev_notes: List[int], cur_notes: List[int], allowed_
         changed_any = False
         for idx in bad_idxs:
             n = v[idx]
-
             options = []
             for delta in (+12, -12):
                 n2 = n + delta
@@ -1086,23 +1032,19 @@ def choose_best_voicing(
     cands = generate_voicing_candidates(raw_notes)
     raw_clamped = clamp_to_range(raw_notes)
 
-    # 1) Controlled glue: never below C3, above C3 only sometimes
     filtered = [v for v in cands if glue_ok(v, rng)]
     if filtered:
         cands = filtered
 
-    # 2) Key-aware cross-chord semitone repair (do NOT remove candidates)
     if prev_voicing is not None:
         allowed_pcs = allowed_resolution_pcs(key_name)
         cands = [repair_cross_semitones(prev_voicing, v, allowed_pcs) for v in cands]
 
-    # 3) Avoid raw shape (if enabled)
     if ENFORCE_NOT_RAW_WHEN_VOICING:
         non_raw = [v for v in cands if not is_raw_shape(v, raw_clamped)]
         if non_raw:
             cands = non_raw
 
-    # 4) Limit shared exact pitches with previous voicing (if possible)
     if prev_voicing is not None:
         limit = max_shared_allowed(prev_name, cur_name)
         filtered = [v for v in cands if shared_pitch_count(prev_voicing, v) <= limit]
@@ -1111,7 +1053,6 @@ def choose_best_voicing(
 
     def cost(v):
         v = sorted(v)
-
         reg_pen = abs(center(v) - TARGET_CENTER) * 120
 
         sp = span(v)
@@ -1122,7 +1063,6 @@ def choose_best_voicing(
             span_pen += (sp - MAX_SPAN) * 220
 
         move_pen = 0 if prev_voicing is None else total_move(prev_voicing, v) * 7
-
         repeat_pen = 2500 if (prev_voicing is not None and sorted(prev_voicing) == v) else 0
 
         shared_pen = 0
@@ -1134,21 +1074,16 @@ def choose_best_voicing(
 
         raw_pen = 100000 if (ENFORCE_NOT_RAW_WHEN_VOICING and is_raw_shape(v, raw_clamped)) else 0
 
-        # Heavy penalty if any bad cross-chord semitone still remains after repair
         cross_pen = 0
         if prev_voicing is not None:
             allowed_pcs = allowed_resolution_pcs(key_name)
             bad_left = len(bad_cross_semitone_indices(prev_voicing, v, allowed_pcs))
             cross_pen = bad_left * 25000
 
-        # glue_pen disabled (we now control glue via glue_ok probability)
-        glue_pen = 0
-
-        return reg_pen + span_pen + move_pen + repeat_pen + shared_pen + raw_pen + cross_pen + glue_pen
+        return reg_pen + span_pen + move_pen + repeat_pen + shared_pen + raw_pen + cross_pen
 
     cands.sort(key=cost)
     return sorted(cands[0])
-
 
 
 # =========================================================
@@ -1204,54 +1139,16 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
         voiced = []
         prev_v = None
         prev_name = chords[0]
-
-        # Create a local RNG for voicing behavior
         rng = random.Random()
 
         for ch_name, notes in zip(chords, raw):
             if prev_v is None:
-                v = choose_best_voicing(
-                    None,
-                    ch_name,
-                    ch_name,
-                    notes,
-                    key_name,
-                    rng
-                )
+                v = choose_best_voicing(None, ch_name, ch_name, notes, key_name, rng)
             else:
-                v = choose_best_voicing(
-                    prev_v,
-                    prev_name,
-                    ch_name,
-                    notes,
-                    key_name,
-                    rng
-                )
-
+                v = choose_best_voicing(prev_v, prev_name, ch_name, notes, key_name, rng)
             voiced.append(v)
             prev_v = v
             prev_name = ch_name
-
-        # Enforce semitone-resolution rule on the loop edge (last -> first)
-        if len(chords) >= 2:
-            voiced[0] = choose_best_voicing(
-                voiced[-1],
-                chords[-1],
-                chords[0],
-                raw[0],
-                key_name,
-                rng
-            )
-
-            # Re-stabilize chord 2 after chord 1 potentially changed
-            voiced[1] = choose_best_voicing(
-                voiced[0],
-                chords[0],
-                chords[1],
-                raw[1],
-                key_name,
-                rng
-            )
 
         out_notes = voiced
     else:
@@ -1277,9 +1174,7 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
 
     rv_tag = "_Revoice" if revoice else ""
     filename = f"Prog_{idx:03d}_in_{safe_token(key_name)}_{chord_list_token(chords)}{rv_tag}.mid"
-
     midi.write(os.path.join(out_dir, filename))
-
 
 
 def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, length_bars=4):
@@ -1291,17 +1186,9 @@ def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, lengt
     raw = chord_to_midi(chord_name, base_oct=BASE_OCTAVE)
     if revoice:
         rng = random.Random()
-        notes = choose_best_voicing(
-            None,
-            chord_name,
-            chord_name,
-            raw,
-            "C",   # key irrelevant here since prev_voicing is None
-            rng
-        )
+        notes = choose_best_voicing(None, chord_name, chord_name, raw, "C", rng)
     else:
         notes = raw
-
 
     for p in sorted(set(notes)):
         inst.notes.append(pretty_midi.Note(
@@ -1317,7 +1204,6 @@ def write_single_chord_midi(out_root: str, chord_name: str, revoice: bool, lengt
     os.makedirs(chords_dir, exist_ok=True)
     rv_tag = "_Revoice" if revoice else ""
     midi.write(os.path.join(chords_dir, f"{safe_token(chord_name)}{rv_tag}.mid"))
-
 
 
 def zip_pack(out_root: str, zip_path: str):
@@ -1344,11 +1230,6 @@ def build_pack(progressions, revoice: bool) -> tuple[str, int]:
     for ch in sorted(unique_chords):
         write_single_chord_midi(prog_root, ch, revoice=revoice, length_bars=4)
 
-    zip_name = DOWNLOAD_NAME.replace(".zip", "")
-    if revoice:
-        zip_name += "_Revoice"
-    zip_name += ".zip"
-
     zip_name = DOWNLOAD_NAME
     if revoice and zip_name.lower().endswith(".zip"):
         zip_name = zip_name[:-4] + "_Revoice.zip"
@@ -1357,7 +1238,6 @@ def build_pack(progressions, revoice: bool) -> tuple[str, int]:
     zip_pack(prog_root, zip_path)
 
     return zip_path, len(unique_chords)
-
 
 
 # =========================================================
@@ -1409,6 +1289,79 @@ with sp_center:
         help="Repositions the notes within each chord for smoother movement and a more original sound."
     )
 
+    # =========================================================
+    # ADVANCED SETTINGS (hidden by default)
+    # =========================================================
+    with st.expander("Advanced Settings", expanded=False):
+        st.caption("Chord type balance. 0 disables a chord type. 50 = default. 100 strongly favors.")
+
+        # Keep defaults at 50 (your current behavior)
+        def adv_slider(label: str, default: int = 50):
+            key = f"adv_{label}"
+            if key not in st.session_state:
+                st.session_state[key] = default
+            return st.slider(label, 0, 100, int(st.session_state[key]), key=key)
+
+        st.markdown("**Major family**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            s_maj9 = adv_slider("maj9")
+            s_maj7 = adv_slider("maj7")
+        with c2:
+            s_add9 = adv_slider("add9")
+            s_6add9 = adv_slider("6add9")
+        with c3:
+            s_6 = adv_slider("6")
+            s_maj = adv_slider("maj")
+
+        st.markdown("**Minor family**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            s_min9 = adv_slider("min9")
+            s_min7 = adv_slider("min7")
+        with c2:
+            s_min11 = adv_slider("min11")
+        with c3:
+            s_min = adv_slider("min")
+
+        st.markdown("**Sus family**")
+        c1, c2 = st.columns(2)
+        with c1:
+            s_sus2add9 = adv_slider("sus2add9")
+            s_sus2 = adv_slider("sus2")
+        with c2:
+            s_sus4add9 = adv_slider("sus4add9")
+            s_sus4 = adv_slider("sus4")
+
+        slider_vals = {
+            "maj9": s_maj9, "maj7": s_maj7, "add9": s_add9, "6add9": s_6add9, "6": s_6, "maj": s_maj,
+            "min9": s_min9, "min7": s_min7, "min11": s_min11, "min": s_min,
+            "sus2add9": s_sus2add9, "sus4add9": s_sus4add9, "sus2": s_sus2, "sus4": s_sus4
+        }
+
+    # If expander never opened yet, we still want slider_vals defined safely
+    if "adv_maj9" not in st.session_state:
+        # initialize once with defaults (50) without showing anything
+        for q in ["maj9","maj7","add9","6add9","6","maj","min9","min7","min11","min","sus2add9","sus4add9","sus2","sus4"]:
+            st.session_state[f"adv_{q}"] = 50
+
+    slider_vals = {
+        "maj9": int(st.session_state["adv_maj9"]),
+        "maj7": int(st.session_state["adv_maj7"]),
+        "add9": int(st.session_state["adv_add9"]),
+        "6add9": int(st.session_state["adv_6add9"]),
+        "6": int(st.session_state["adv_6"]),
+        "maj": int(st.session_state["adv_maj"]),
+        "min9": int(st.session_state["adv_min9"]),
+        "min7": int(st.session_state["adv_min7"]),
+        "min11": int(st.session_state["adv_min11"]),
+        "min": int(st.session_state["adv_min"]),
+        "sus2add9": int(st.session_state["adv_sus2add9"]),
+        "sus4add9": int(st.session_state["adv_sus4add9"]),
+        "sus2": int(st.session_state["adv_sus2"]),
+        "sus4": int(st.session_state["adv_sus4"]),
+    }
+
 btn_left, btn_center, btn_right = st.columns([1, 2, 1])
 with btn_center:
     generate_clicked = st.button("Generate Progressions", use_container_width=True)
@@ -1422,9 +1375,12 @@ if generate_clicked:
         with st.spinner("Generating progressions…"):
             seed = int(np.random.randint(1, 2_000_000_000))
 
+            qmult = build_quality_mult_from_sliders(slider_vals)
+
             progressions, pattern_dupe_used, pattern_dupe_max, low_sim_total, qual_usage = generate_progressions(
                 n=int(n_progressions),
-                seed=seed
+                seed=seed,
+                qmult=qmult
             )
 
             if low_sim_total != 0:
@@ -1436,6 +1392,7 @@ if generate_clicked:
             st.session_state.zip_path = zip_path
             st.session_state.progression_count = len(progressions)
             st.session_state.chord_count = chord_count
+            st.session_state.qual_usage = qual_usage
 
         st.markdown(
             """
@@ -1458,8 +1415,6 @@ if generate_clicked:
 # SUMMARY + DOWNLOAD + TABLE
 # =========================================================
 if "progressions" in st.session_state and st.session_state.get("zip_path"):
-
-    
 
     a, b = st.columns(2)
     a.metric("Progressions Generated", int(st.session_state.get("progression_count", 0)))
@@ -1486,6 +1441,15 @@ if "progressions" in st.session_state and st.session_state.get("zip_path"):
 
     st.markdown("### Progressions List")
     st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # Optional: show usage (hidden)
+    if "qual_usage" in st.session_state:
+        with st.expander("Chord Types Used", expanded=False):
+            usage_df = pd.DataFrame(
+                [{"Quality": k, "Count": int(v)} for k, v in st.session_state.qual_usage.most_common()]
+            )
+            st.dataframe(usage_df, use_container_width=True, hide_index=True)
+
 
   
 
