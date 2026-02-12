@@ -1205,8 +1205,8 @@ def write_progression_midi(out_root: str, idx: int, chords, durations, key_name:
         prev_v = None
         prev_name = chords[0]
 
-    # Create a local RNG for voicing behavior
-    rng = random.Random()
+        # Create a local RNG for voicing behavior
+        rng = random.Random()
 
     for ch_name, notes in zip(chords, raw):
         if prev_v is None:
