@@ -1342,6 +1342,11 @@ def choose_best_voicing(
     if prev_voicing is not None:
         allowed_pcs = allowed_resolution_pcs(key_name)
         cands = [repair_cross_semitones(prev_voicing, v, allowed_pcs) for v in cands]
+    # ✅ Re-filter glue AFTER repair (prevents new low semitone clusters)
+    filtered = [v for v in cands if glue_ok(v, rng)]
+    if filtered:
+        cands = filtered
+    
 
     # Shared pitch cap
     if prev_voicing is not None:
