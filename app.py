@@ -529,7 +529,7 @@ SUS_UPGRADE_PROB = 0
 
 MAJ_POOL_BASE = [("maj9", 10), ("maj7", 9), ("add9", 7), ("6add9", 5), ("6", 4), ("maj", 4)]
 MIN_POOL_BASE = [("min9", 10), ("min7", 9), ("min11", 4), ("min", 4)]
-SUS_POOL_BASE = [("sus2add9", 2), ("sus4add9", 2), ("sus2", 2), ("sus4", 2)]
+SUS_POOL_BASE = [("sus2add9", 3), ("sus4add9", 3), ("sus2", 3), ("sus4", 3)]
 
 
 def _scaled_pool(pool, mult):
