@@ -607,12 +607,19 @@ def _pattern_fingerprint(degs, quals):
 
 
 # =========================================================
-# CHORD TYPE BALANCE (ADVANCED)
+# CHORD TYPE BALANCE (ADVANCED) + STRICT MODE
 # - Sliders are 0..100 with default 50.
-# - 50 = neutral (original weights)
-# - 0 = disabled
-# - 100 = up to 2x
+# - 50 = neutral
+# - 0  = disabled
+# - 100 = strongly favored
+#
+# STRICT_SLIDERS:
+# If user sets ONLY SUS >0 (others 0) => ONLY SUS chords.
+# Same for any single chord type.
+# If impossible under diatonic + templates + uniqueness => clean failure (no fallback).
 # =========================================================
+STRICT_SLIDERS = True  # ✅ True = sliders act like hard rules
+
 ADV_ALL_QUALITIES = [
     "maj9","maj7","add9","6add9","6","maj",
     "min9","min7","min11","min",
@@ -633,66 +640,54 @@ def _balance_factor(v: int) -> float:
     return 1.0 + ((v - 50) / 50.0) * 1.0
 
 
-def _apply_balance_to_pool(pool: List[Tuple[str, float]], balance: Dict[str, int]) -> List[Tuple[str, float]]:
-    out = []
-    for q, w in pool:
-        factor = _balance_factor(balance.get(q, ADV_DEFAULT_VALUE))
-        w2 = w * factor
-        if w2 > 0:
-            out.append((q, w2))
+def _enabled_qualities(balance: Optional[Dict[str, int]]) -> List[str]:
+    if (not ENABLE_CHORD_BALANCE_FEATURE) or (not balance):
+        return ADV_ALL_QUALITIES[:]  # feature off => normal behavior
+    return [q for q in ADV_ALL_QUALITIES if int(balance.get(q, ADV_DEFAULT_VALUE)) > 0]
+
+
+def _build_deg_allowed(balance: Optional[Dict[str, int]], key: str) -> Dict[int, List[Tuple[str, float]]]:
+    """
+    Returns per-degree pools for THIS key: deg -> [(quality, weight), ...]
+    Strict mode: ONLY enabled qualities, diatonic-filtered, no silent fallback.
+    """
+    enabled = _enabled_qualities(balance)
+
+    if STRICT_SLIDERS and balance and len(enabled) == 0:
+        raise RuntimeError("All chord-type sliders are 0. Enable at least one chord type.")
+
+    out: Dict[int, List[Tuple[str, float]]] = {}
+    for deg in range(7):
+        root = SCALES[key][deg]
+        items: List[Tuple[str, float]] = []
+
+        for q in enabled:
+            if _is_diatonic_chord(key, root, q):
+                # weights only bias selection WITHIN enabled set
+                w = 1.0
+                if balance:
+                    w = max(1e-9, _balance_factor(balance.get(q, ADV_DEFAULT_VALUE)))
+                items.append((q, w))
+
+        out[deg] = items
+
     return out
 
 
-def _build_deg_allowed(balance: Optional[Dict[str, int]]):
-    if (not ENABLE_CHORD_BALANCE_FEATURE) or (not balance):
-        maj_pool = MAJ_POOL_BASE[:]
-        min_pool = MIN_POOL_BASE[:]
-        sus_pool = SUS_POOL_SCALED_BASE[:]
-    else:
-        maj_pool = _apply_balance_to_pool(MAJ_POOL_BASE, balance)
-        min_pool = _apply_balance_to_pool(MIN_POOL_BASE, balance)
-        sus_pool = _apply_balance_to_pool(SUS_POOL_SCALED_BASE, balance)
+def _pick_quality_diatonic(
+    rng: random.Random,
+    key: str,
+    deg: int,
+    deg_allowed: Dict[int, List[Tuple[str, float]]]
+) -> Optional[str]:
+    """
+    Strict: ONLY pick from deg_allowed. If empty -> None (template invalid).
+    """
+    pool = deg_allowed.get(deg, [])
+    if not pool:
+        return None
+    return _wchoice(rng, pool)
 
-        # Only restore defaults if EVERYTHING is disabled (prevents 0 sliders being ignored)
-        if (not maj_pool) and (not min_pool) and (not sus_pool):
-            maj_pool = MAJ_POOL_BASE[:]
-            min_pool = MIN_POOL_BASE[:]
-            sus_pool = SUS_POOL_SCALED_BASE[:]
-
-
-    return {
-        0: maj_pool + sus_pool,
-        1: min_pool + maj_pool + sus_pool,
-        2: min_pool + maj_pool + sus_pool,
-        3: maj_pool + min_pool + sus_pool,
-        4: maj_pool + min_pool + sus_pool,
-        5: min_pool + maj_pool + sus_pool,
-        6: min_pool + maj_pool + sus_pool,
-    }
-
-
-def _pick_quality_diatonic(rng: random.Random, key: str, deg: int, deg_allowed: Dict[int, List[Tuple[str, float]]]) -> str:
-    root = SCALES[key][deg]
-    triad_boost = (rng.random() < TRIAD_PROB_BASE)
-    pool = deg_allowed[deg]
-
-    for _ in range(200):
-        q = _wchoice(rng, pool)
-
-        if q in ("sus2", "sus4") and rng.random() < SUS_UPGRADE_PROB:
-            if rng.random() >= BARE_SUS_PROB:
-                q = "sus2add9" if q == "sus2" else "sus4add9"
-
-        if q in ("maj", "min") and (not triad_boost) and rng.random() < 0.85:
-            continue
-
-        if _is_diatonic_chord(key, root, q):
-            return q
-
-    for q in SAFE_FALLBACK_ORDER:
-        if _is_diatonic_chord(key, root, q):
-            return q
-    return "maj7"
 
 
 def _dedupe_inside_progression(rng: random.Random, key: str, degs: list, quals: list):
@@ -756,18 +751,24 @@ def _dedupe_inside_progression(rng: random.Random, key: str, degs: list, quals: 
 
 
 def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int, deg_allowed):
-    quals = [_pick_quality_diatonic(rng, key, d, deg_allowed=deg_allowed) for d in degs]
+    # STRICT-safe quality picking:
+    # - _pick_quality_diatonic() returns None if this degree has no allowed qualities (under strict sliders)
+    # - returning None here simply rejects this template and tries another
+    quals = []
+    for d in degs:
+        q = _pick_quality_diatonic(rng, key, d, deg_allowed=deg_allowed)
+        if q is None:
+            return None  # strict: this template can't work with enabled chord types
+        quals.append(q)
 
     # =========================================================
     # RULE: Do not allow progression to start with SUS chord
     # unless SUS sliders are strongly boosted (>80)
     # =========================================================
-
     def is_sus(q: str) -> bool:
         return q.startswith("sus")
 
     sus_allowed_start = False
-
     if chord_balance:
         sus_keys = ["sus2", "sus4", "sus2add9", "sus4add9"]
         if any(chord_balance.get(k, ADV_DEFAULT_VALUE) > 80 for k in sus_keys):
@@ -776,7 +777,9 @@ def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int
     if is_sus(quals[0]) and not sus_allowed_start:
         return None
 
-
+    # STRICT mode note:
+    # _dedupe_inside_progression() should early-return (degs, quals) without mutating,
+    # so your "only X chord types" rule isn't violated.
     ded = _dedupe_inside_progression(rng, key, degs[:], quals[:])
     if ded is None:
         return None
@@ -784,11 +787,14 @@ def _build_progression(rng: random.Random, key: str, degs: list, total_bars: int
 
     roots = [SCALES[key][d] for d in degs]
 
+    # Keep diatonic safety
     if any(not _is_diatonic_chord(key, r, q) for r, q in zip(roots, quals)):
         return None
 
+    # Keep loop shared-tone safety
     if not _shared_tone_ok_loop(roots, quals, need=MIN_SHARED_TONES, loop=True):
         return None
+
 
     # =========================================================
     # SUS SAFETY SYSTEM (default + sus-heavy mode)
@@ -925,7 +931,7 @@ def _pick_keys_even(n: int, rng: random.Random) -> list:
 def generate_progressions(n: int, seed: int, chord_balance: Optional[Dict[str, int]] = None):
     rng = random.Random(seed)
     keys = _pick_keys_even(n, rng)
-    deg_allowed = _build_deg_allowed(chord_balance)
+    deg_allowed = None  # built per key inside loop
 
     max_pattern_dupes = int(math.floor(n * MAX_PATTERN_DUPLICATE_RATIO))
     pattern_dupe_used = 0
@@ -939,6 +945,7 @@ def generate_progressions(n: int, seed: int, chord_balance: Optional[Dict[str, i
 
     for i in range(n):
         key = keys[i]
+        deg_allowed = _build_deg_allowed(chord_balance, key)  # ✅ key-aware + strict
         built = None
 
         for _ in range(MAX_TRIES_PER_PROG):
