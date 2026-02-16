@@ -1770,7 +1770,7 @@ SEC_PER_BAR = sec_per_bar()
 
 
 # =========================================================
-# EXPORTER (PATCH 2: HARD REGISTER LOCK, RAW + REVOICED)
+# EXPORTER (PATCH 3: HARD REGISTER LOCK + REGISTER OPTIMIZER)
 # =========================================================
 
 # IMPORTANT:
@@ -1779,7 +1779,7 @@ SEC_PER_BAR = sec_per_bar()
 
 # Make sure these exist above this exporter section in your file:
 # BPM, TIME_SIG, BASE_OCTAVE, VELOCITY, SEC_PER_BAR, BAR_DIR
-# chord_to_midi(), choose_best_voicing()
+# chord_to_midi(), choose_best_voicing(), _min_assignment_move()
 
 def safe_token(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9_#-]+", "", str(s))
@@ -1792,9 +1792,6 @@ def chord_list_token(chords):
 # =========================================================
 # GLOBAL REGISTER LOCK (edit these any time)
 # =========================================================
-# You said: bass mostly 40 to 52, never below C2.
-# We implement that as "never below NOTE_MIN_MIDI" and keep bass in BASS window.
-
 BASS_MIN_MIDI = 40     # bass must not be below this
 BASS_MAX_MIDI = 52     # bass should not be above this (we pull down if safe)
 
@@ -1803,11 +1800,11 @@ NOTE_MAX_MIDI = 88     # soft ceiling (keeps voicings from flying too high)
 
 MAX_OCTAVE_SHIFTS = 6  # safety cap so we never loop forever
 
+
 # =========================================================
 # GLOBAL TRANSPOSE (MASTER OCTAVE SHIFT)
 # =========================================================
 GLOBAL_TRANSPOSE = 12   # 12 = +1 octave, 0 = off
-
 
 
 def _shift_octaves(notes: List[int], octs: int) -> List[int]:
@@ -1842,13 +1839,11 @@ def _enforce_register(notes: List[int]) -> List[int]:
         v = sorted(set(fixed))
 
     # 2) Force bass into requested window by shifting whole chord.
-    # Push up if bass too low
     for _ in range(MAX_OCTAVE_SHIFTS):
         if min(v) >= BASS_MIN_MIDI:
             break
         v = sorted(set(_shift_octaves(v, +1)))
 
-    # Pull down if bass too high, but never break NOTE_MIN_MIDI
     for _ in range(MAX_OCTAVE_SHIFTS):
         if min(v) <= BASS_MAX_MIDI:
             break
@@ -1858,19 +1853,14 @@ def _enforce_register(notes: List[int]) -> List[int]:
         else:
             break
 
-    # 3) Ceiling control. Pull down if too high, but never break floor and preferably keep bass window.
+    # 3) Ceiling control.
     for _ in range(MAX_OCTAVE_SHIFTS):
         if max(v) <= NOTE_MAX_MIDI:
             break
         candidate = sorted(set(_shift_octaves(v, -1)))
         if min(candidate) < NOTE_MIN_MIDI:
             break
-        # Prefer candidates that keep bass within window
-        if BASS_MIN_MIDI <= min(candidate) <= BASS_MAX_MIDI:
-            v = candidate
-        else:
-            # Still allow if it reduces insane highs without breaking the floor
-            v = candidate
+        v = candidate
 
     # Final hard floor re-check
     for _ in range(MAX_OCTAVE_SHIFTS):
@@ -1878,7 +1868,6 @@ def _enforce_register(notes: List[int]) -> List[int]:
             break
         v = sorted(set(_shift_octaves(v, +1)))
 
-    # FINAL GUARANTEE: if anything still below, raise those notes
     if min(v) < NOTE_MIN_MIDI:
         fixed = []
         for n in v:
@@ -1906,15 +1895,40 @@ def validate_progressions(progressions):
             _ = _enforce_register(chord_to_midi(ch))
 
 
+# =========================================================
+# REGISTER OPTIMIZER (shared PCs + adjacency wins when needed)
+# =========================================================
 def _oct_shift(notes: List[int], k: int) -> List[int]:
     return [int(n + 12 * k) for n in notes]
 
 
-def _shared_pitch_class(prev: List[int], cur: List[int]) -> int:
-    prev_pc = {p % 12 for p in prev}
-    cur_pc = {p % 12 for p in cur}
-    return len(prev_pc & cur_pc)
+def _pcset(notes: List[int]) -> set:
+    return {int(p) % 12 for p in notes}
 
+
+def _shared_pitch_class(prev: List[int], cur: List[int]) -> int:
+    return len(_pcset(prev) & _pcset(cur))
+
+
+def _adjacent_pc(prev: List[int], cur: List[int], dist: int = 1) -> int:
+    """
+    Counts how many pitch-classes in 'cur' are within +/-dist semitones
+    of any pitch-class in 'prev'.
+    dist=1 -> semitone adjacency
+    dist=2 -> semitone + whole-tone adjacency
+    """
+    A = _pcset(prev)
+    B = _pcset(cur)
+    if not A or not B:
+        return 0
+
+    targets = set()
+    for pc in A:
+        for d in range(1, dist + 1):
+            targets.add((pc + d) % 12)
+            targets.add((pc - d) % 12)
+
+    return len(B & targets)
 
 
 def _voice_leading_cost(prev: List[int], cur: List[int]) -> float:
@@ -1926,10 +1940,15 @@ def optimize_progression_register(
     search_shifts=range(-2, 3),
 ) -> List[List[int]]:
     """
-    Post-process each chord so adjacent chords:
-    - share as many exact notes as possible
-    - otherwise move as little as possible
-    Always respects your register lock (_enforce_register).
+    For each chord after the first, try octave shifts and pick the best one.
+
+    Priority:
+    - More shared pitch-classes is good
+    - If shared is lower, adjacency (semi/whole tone) can win (your request)
+    - Less total movement is better
+    - Smaller bass jumps are better
+
+    Always respects _enforce_register.
     """
     if not chords_notes:
         return chords_notes
@@ -1946,11 +1965,18 @@ def optimize_progression_register(
             cand = _enforce_register(_oct_shift(cur_raw, k))
 
             shared = _shared_pitch_class(prev, cand)
+            adj1 = _adjacent_pc(prev, cand, dist=1)
+            adj2 = _adjacent_pc(prev, cand, dist=2)
+
             move = _voice_leading_cost(prev, cand)
             bass_jump = abs(min(cand) - min(prev))
 
-            # Higher is better: more shared, less movement, less bass jump
-            score = (shared, -move, -bass_jump)
+            # adjacency can beat fewer shared tones:
+            # nearness weights tuned so:
+            # shared matters, but adj1 can overtake when shared drops by 1
+            nearness = shared * 2 + adj1 * 3 + adj2 * 1
+
+            score = (nearness, -move, -bass_jump)
 
             if best_score is None or score > best_score:
                 best_score = score
@@ -1962,6 +1988,9 @@ def optimize_progression_register(
     return out
 
 
+# =========================================================
+# MIDI WRITERS
+# =========================================================
 def write_progression_midi(
     out_root: str,
     idx: int,
@@ -2000,14 +2029,13 @@ def write_progression_midi(
     else:
         out_notes = raw
 
-    # NEW: octave/register optimizer for shared notes + closest adjacent chords
+    # IMPORTANT: THIS IS THE PART YOU WERE MISSING (because of duplicate function)
     out_notes = optimize_progression_register(out_notes)
 
     t = 0.0
     for notes, bars in zip(out_notes, durations):
         dur = bars * SEC_PER_BAR
 
-        # APPLY GLOBAL TRANSPOSE (per chord)
         shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
 
         for p in sorted(set(shifted)):
@@ -2019,76 +2047,6 @@ def write_progression_midi(
             ))
 
         t += dur
-
-    midi.instruments.append(inst)
-
-    total_bars = sum(durations)
-    out_dir = os.path.join(out_root, "Progressions", BAR_DIR[total_bars])
-    os.makedirs(out_dir, exist_ok=True)
-
-    rv_tag = "_Revoiced" if revoice else ""
-    filename = f"Prog_{idx:03d}_in_{safe_token(key_name)}_{chord_list_token(chords)}{rv_tag}.mid"
-    midi.write(os.path.join(out_dir, filename))
-
-
-
-def write_progression_midi(
-    out_root: str,
-    idx: int,
-    chords,
-    durations,
-    key_name: str,
-    revoice: bool,
-    seed: int
-):
-    midi = pretty_midi.PrettyMIDI(initial_tempo=BPM)
-    midi.time_signature_changes = [pretty_midi.TimeSignature(TIME_SIG[0], TIME_SIG[1], 0)]
-    inst = pretty_midi.Instrument(program=0)
-
-    # RAW notes are always register locked
-    raw = [_enforce_register(chord_to_midi(ch)) for ch in chords]
-
-    if revoice:
-        voiced = []
-        prev_v = None
-        prev_name = chords[0]
-        rng = random.Random(seed + idx)
-
-        for ch_name, notes in zip(chords, raw):
-            if prev_v is None:
-                v = choose_best_voicing(None, ch_name, ch_name, notes, key_name, rng)
-            else:
-                v = choose_best_voicing(prev_v, prev_name, ch_name, notes, key_name, rng)
-
-            # FINAL HARD LOCK after voicing (this is what stops the C1/C2 garbage)
-            v = _enforce_register(v)
-
-            voiced.append(v)
-            prev_v = v
-            prev_name = ch_name
-
-        out_notes = voiced
-    else:
-        out_notes = raw
-    
-    t = 0.0    
-
-    for notes, bars in zip(out_notes, durations):
-        dur = bars * SEC_PER_BAR
-
-        # APPLY GLOBAL TRANSPOSE
-        shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
-
-        for p in sorted(set(shifted)):
-            inst.notes.append(pretty_midi.Note(
-                velocity=int(VELOCITY),
-                pitch=int(p),
-                start=t,
-                end=t + dur
-            ))
-    
-        t += dur    
-
 
     midi.instruments.append(inst)
 
@@ -2122,10 +2080,8 @@ def write_single_chord_midi(
     else:
         notes = raw
 
-    # Final hard lock
     notes = _enforce_register(notes)
 
-    # APPLY GLOBAL TRANSPOSE
     shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
 
     for p in sorted(set(shifted)):
@@ -2135,7 +2091,6 @@ def write_single_chord_midi(
             start=0.0,
             end=dur
         ))
-
 
     midi.instruments.append(inst)
 
@@ -2191,6 +2146,7 @@ def build_pack(progressions, revoice: bool, seed: int) -> tuple[str, int, str]:
     zip_pack(prog_root, zip_path)
 
     return zip_path, len(unique_chords), final_zip_name
+
 
 
 # =========================================================
