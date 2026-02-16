@@ -1945,6 +1945,8 @@ def write_progression_midi(
         out_notes = voiced
     else:
         out_notes = raw
+    
+    t = 0.0    
 
     for notes, bars in zip(out_notes, durations):
         dur = bars * SEC_PER_BAR
