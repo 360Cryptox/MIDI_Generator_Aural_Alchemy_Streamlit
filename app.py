@@ -1961,6 +1961,8 @@ def write_progression_midi(
             start=t,
             end=t + dur
         ))
+    
+    t += dur    
 
 
     midi.instruments.append(inst)
