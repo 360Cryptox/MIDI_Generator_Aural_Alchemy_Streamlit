@@ -1947,7 +1947,7 @@ def write_progression_midi(
         out_notes = raw
 
     for notes, bars in zip(out_notes, durations):
-    dur = bars * SEC_PER_BAR
+        dur = bars * SEC_PER_BAR
 
     # APPLY GLOBAL TRANSPOSE
     shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
