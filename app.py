@@ -1951,18 +1951,18 @@ def write_progression_midi(
     for notes, bars in zip(out_notes, durations):
         dur = bars * SEC_PER_BAR
 
-    # APPLY GLOBAL TRANSPOSE
-    shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
+        # APPLY GLOBAL TRANSPOSE
+        shifted = [int(p + GLOBAL_TRANSPOSE) for p in notes]
 
-    for p in sorted(set(shifted)):
-        inst.notes.append(pretty_midi.Note(
-            velocity=int(VELOCITY),
-            pitch=int(p),
-            start=t,
-            end=t + dur
-        ))
+        for p in sorted(set(shifted)):
+            inst.notes.append(pretty_midi.Note(
+                velocity=int(VELOCITY),
+                pitch=int(p),
+                start=t,
+                end=t + dur
+            ))
     
-    t += dur    
+        t += dur    
 
 
     midi.instruments.append(inst)
