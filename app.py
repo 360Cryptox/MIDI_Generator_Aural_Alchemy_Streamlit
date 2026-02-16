@@ -1770,8 +1770,16 @@ SEC_PER_BAR = sec_per_bar()
 
 
 # =========================================================
-# EXPORTER (hard floor + bass zone + safe write)
+# EXPORTER (PATCH 2: HARD REGISTER LOCK, RAW + REVOICED)
 # =========================================================
+
+# IMPORTANT:
+# MIDI numbers are identical in every DAW. Only the octave labels differ.
+# So we enforce safety by MIDI note numbers only.
+
+# Make sure these exist above this exporter section in your file:
+# BPM, TIME_SIG, BASE_OCTAVE, VELOCITY, SEC_PER_BAR, BAR_DIR
+# chord_to_midi(), choose_best_voicing()
 
 def safe_token(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9_#-]+", "", str(s))
@@ -1781,81 +1789,116 @@ def chord_list_token(chords):
     return "-".join(safe_token(c) for c in chords)
 
 
-def _ensure_floor_and_bass_zone(notes: List[int]) -> List[int]:
-    """
-    Absolute exporter safety. Assumes the voicing section defines:
-      - ABS_NOTE_FLOOR
-      - _sanitize_notes_strict
-      - _prefer_bass_zone
-    """
-    v = _sanitize_notes_strict(notes)
-    v = _prefer_bass_zone(v)
+# =========================================================
+# GLOBAL REGISTER LOCK (edit these any time)
+# =========================================================
+# You said: bass mostly 40 to 52, never below C2.
+# We implement that as "never below NOTE_MIN_MIDI" and keep bass in BASS window.
 
-    # Final, absolute guarantee
-    if v and min(v) < ABS_NOTE_FLOOR:
-        while min(v) < ABS_NOTE_FLOOR:
-            v = [p + 12 for p in v]
-        v = _sanitize_notes_strict(v)
-        v = _prefer_bass_zone(v)
+BASS_MIN_MIDI = 40     # bass must not be below this
+BASS_MAX_MIDI = 52     # bass should not be above this (we pull down if safe)
+
+NOTE_MIN_MIDI = 40     # absolute floor for ANY note (hard ban below this)
+NOTE_MAX_MIDI = 88     # soft ceiling (keeps voicings from flying too high)
+
+MAX_OCTAVE_SHIFTS = 6  # safety cap so we never loop forever
+
+
+def _shift_octaves(notes: List[int], octs: int) -> List[int]:
+    return [int(n + 12 * octs) for n in notes]
+
+
+def _enforce_register(notes: List[int]) -> List[int]:
+    """
+    Hard guarantees:
+    1) No note below NOTE_MIN_MIDI, ever.
+    2) Bass (min note) forced into BASS_MIN_MIDI..BASS_MAX_MIDI using whole-chord octave shifts.
+    3) Keep top under NOTE_MAX_MIDI when possible.
+    """
+    if not notes:
+        return []
+
+    v = sorted(set(int(n) for n in notes))
+
+    # 1) Absolute floor. Push up by octaves until safe.
+    for _ in range(MAX_OCTAVE_SHIFTS):
+        if min(v) >= NOTE_MIN_MIDI:
+            break
+        v = sorted(set(_shift_octaves(v, +1)))
+
+    # If still below floor after cap, hard clamp by pushing all offending notes up
+    if min(v) < NOTE_MIN_MIDI:
+        fixed = []
+        for n in v:
+            while n < NOTE_MIN_MIDI:
+                n += 12
+            fixed.append(n)
+        v = sorted(set(fixed))
+
+    # 2) Force bass into requested window by shifting whole chord.
+    # Push up if bass too low
+    for _ in range(MAX_OCTAVE_SHIFTS):
+        if min(v) >= BASS_MIN_MIDI:
+            break
+        v = sorted(set(_shift_octaves(v, +1)))
+
+    # Pull down if bass too high, but never break NOTE_MIN_MIDI
+    for _ in range(MAX_OCTAVE_SHIFTS):
+        if min(v) <= BASS_MAX_MIDI:
+            break
+        candidate = sorted(set(_shift_octaves(v, -1)))
+        if min(candidate) >= NOTE_MIN_MIDI:
+            v = candidate
+        else:
+            break
+
+    # 3) Ceiling control. Pull down if too high, but never break floor and preferably keep bass window.
+    for _ in range(MAX_OCTAVE_SHIFTS):
+        if max(v) <= NOTE_MAX_MIDI:
+            break
+        candidate = sorted(set(_shift_octaves(v, -1)))
+        if min(candidate) < NOTE_MIN_MIDI:
+            break
+        # Prefer candidates that keep bass within window
+        if BASS_MIN_MIDI <= min(candidate) <= BASS_MAX_MIDI:
+            v = candidate
+        else:
+            # Still allow if it reduces insane highs without breaking the floor
+            v = candidate
+
+    # Final hard floor re-check
+    for _ in range(MAX_OCTAVE_SHIFTS):
+        if min(v) >= NOTE_MIN_MIDI:
+            break
+        v = sorted(set(_shift_octaves(v, +1)))
+
+    # FINAL GUARANTEE: if anything still below, raise those notes
+    if min(v) < NOTE_MIN_MIDI:
+        fixed = []
+        for n in v:
+            while n < NOTE_MIN_MIDI:
+                n += 12
+            fixed.append(n)
+        v = sorted(set(fixed))
 
     return v
-
-
-def _reduce_bass_jump(prev_notes: Optional[List[int]], cur_notes: List[int]) -> List[int]:
-    """
-    If bass jumps too much, octave-shift the whole chord to reduce jump.
-    Uses MAX_BASS_JUMP and ABS_NOTE_FLOOR/ABS_NOTE_CEIL from voicing section.
-    """
-    if not prev_notes:
-        return cur_notes
-
-    prev_b = min(prev_notes) if prev_notes else None
-    cur_b = min(cur_notes) if cur_notes else None
-    if prev_b is None or cur_b is None:
-        return cur_notes
-
-    if abs(cur_b - prev_b) <= MAX_BASS_JUMP:
-        return cur_notes
-
-    candidates = []
-    for k in (-24, -12, 0, 12, 24):
-        vv = [p + k for p in cur_notes]
-        vv = _ensure_floor_and_bass_zone(vv)
-        if vv and min(vv) >= ABS_NOTE_FLOOR and max(vv) <= ABS_NOTE_CEIL:
-            candidates.append((abs(min(vv) - prev_b), vv))
-
-    if not candidates:
-        return cur_notes
-
-    candidates.sort(key=lambda x: x[0])
-    return candidates[0][1]
 
 
 def validate_progressions(progressions):
     if not progressions:
         raise ValueError("No progressions generated.")
-
     for i, item in enumerate(progressions, start=1):
         if len(item) != 3:
             raise ValueError(f"Progression {i} must be (chords, durations, key).")
-
         chords, durations, key_name = item
-
         if len(chords) != len(durations):
             raise ValueError(f"Progression {i}: chords/durations mismatch.")
-
         bars = sum(durations)
         if bars not in (4, 8, 16):
             raise ValueError(f"Progression {i}: invalid bar sum {bars}.")
-
-        # Validate chord parsing + enforce exporter floor immediately
+        # Validate chord parsing and enforce register on raw chord
         for ch in chords:
-            v = chord_to_midi(ch)
-            v = _ensure_floor_and_bass_zone(v)
-            if not v:
-                raise ValueError(f"Progression {i}: chord produced empty notes: {ch}")
-            if min(v) < ABS_NOTE_FLOOR:
-                raise ValueError(f"Progression {i}: chord below floor after sanitize: {ch}")
+            _ = _enforce_register(chord_to_midi(ch))
 
 
 def write_progression_midi(
@@ -1871,8 +1914,8 @@ def write_progression_midi(
     midi.time_signature_changes = [pretty_midi.TimeSignature(TIME_SIG[0], TIME_SIG[1], 0)]
     inst = pretty_midi.Instrument(program=0)
 
-    # RAW registered safely already (your chord_to_midi now registers into zone)
-    raw = [_ensure_floor_and_bass_zone(chord_to_midi(ch)) for ch in chords]
+    # RAW notes are always register locked
+    raw = [_enforce_register(chord_to_midi(ch)) for ch in chords]
 
     if revoice:
         voiced = []
@@ -1886,8 +1929,8 @@ def write_progression_midi(
             else:
                 v = choose_best_voicing(prev_v, prev_name, ch_name, notes, key_name, rng)
 
-            v = _ensure_floor_and_bass_zone(v)
-            v = _reduce_bass_jump(prev_v, v)
+            # FINAL HARD LOCK after voicing (this is what stops the C1/C2 garbage)
+            v = _enforce_register(v)
 
             voiced.append(v)
             prev_v = v
@@ -1895,38 +1938,20 @@ def write_progression_midi(
 
         out_notes = voiced
     else:
-        # Even raw needs the same progression-level jump smoothing
-        safe = []
-        prev_v = None
-        for notes in raw:
-            v = _ensure_floor_and_bass_zone(notes)
-            v = _reduce_bass_jump(prev_v, v)
-            safe.append(v)
-            prev_v = v
-        out_notes = safe
-
-    # Absolute final pass, just in case
-    final_notes = []
-    prev_v = None
-    for v in out_notes:
-        v = _ensure_floor_and_bass_zone(v)
-        v = _reduce_bass_jump(prev_v, v)
-        v = _ensure_floor_and_bass_zone(v)
-        final_notes.append(v)
-        prev_v = v
+        out_notes = raw
 
     t = 0.0
-    for notes, bars in zip(final_notes, durations):
+    for notes, bars in zip(out_notes, durations):
+        # One more safety lock right before writing
+        notes = _enforce_register(notes)
+
         dur = bars * SEC_PER_BAR
         for p in sorted(set(notes)):
-            # Final hard floor at write-time
-            if int(p) < int(ABS_NOTE_FLOOR):
-                continue
             inst.notes.append(pretty_midi.Note(
                 velocity=int(VELOCITY),
                 pitch=int(p),
-                start=float(t),
-                end=float(t + dur)
+                start=t,
+                end=t + dur
             ))
         t += dur
 
@@ -1945,7 +1970,7 @@ def write_single_chord_midi(
     out_root: str,
     chord_name: str,
     revoice: bool,
-    length_bars: int = 4,
+    length_bars=4,
     seed: int = 1337
 ):
     dur = length_bars * SEC_PER_BAR
@@ -1953,26 +1978,24 @@ def write_single_chord_midi(
     midi.time_signature_changes = [pretty_midi.TimeSignature(TIME_SIG[0], TIME_SIG[1], 0)]
     inst = pretty_midi.Instrument(program=0)
 
-    raw = _ensure_floor_and_bass_zone(chord_to_midi(chord_name))
+    raw = _enforce_register(chord_to_midi(chord_name))
 
     if revoice:
         rng = random.Random(seed)
         notes = choose_best_voicing(None, chord_name, chord_name, raw, "C", rng)
-        notes = _ensure_floor_and_bass_zone(notes)
+        notes = _enforce_register(notes)
     else:
         notes = raw
 
-    # Last hard guard
-    notes = _ensure_floor_and_bass_zone(notes)
+    # Final hard lock
+    notes = _enforce_register(notes)
 
     for p in sorted(set(notes)):
-        if int(p) < int(ABS_NOTE_FLOOR):
-            continue
         inst.notes.append(pretty_midi.Note(
             velocity=int(VELOCITY),
             pitch=int(p),
             start=0.0,
-            end=float(dur)
+            end=dur
         ))
 
     midi.instruments.append(inst)
@@ -2008,8 +2031,8 @@ def build_pack(progressions, revoice: bool, seed: int) -> tuple[str, int, str]:
             chords,
             durations,
             key_name,
-            revoice=bool(revoice),
-            seed=int(seed)
+            revoice=revoice,
+            seed=seed
         )
         unique_chords.update(chords)
 
@@ -2017,9 +2040,9 @@ def build_pack(progressions, revoice: bool, seed: int) -> tuple[str, int, str]:
         write_single_chord_midi(
             prog_root,
             ch,
-            revoice=bool(revoice),
+            revoice=revoice,
             length_bars=4,
-            seed=int(seed) + 999
+            seed=seed + 999
         )
 
     base = DOWNLOAD_NAME[:-4] if DOWNLOAD_NAME.lower().endswith(".zip") else DOWNLOAD_NAME
