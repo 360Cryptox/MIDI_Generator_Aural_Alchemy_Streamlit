@@ -1284,6 +1284,7 @@ def get_voicing_profile() -> dict:
 
 # =========================================================
 # CHORD -> MIDI + VOICING ENGINE (HARD-SAFE, NO SUB-FLOOR)
+# (PATCH: DEFAULT = VOICE-LED TIGHT, + WIDE + LOW MODES)
 # =========================================================
 
 NOTE_TO_SEMITONE = NOTE_TO_PC.copy()
@@ -1291,50 +1292,83 @@ NOTE_TO_SEMITONE = NOTE_TO_PC.copy()
 # -------------------------
 # HARD GLOBAL PITCH LIMITS
 # -------------------------
-# ABSOLUTE rule: no note below this MIDI number, ever.
-# Your requested "never below C2-ish": use 40 by default.
 ABS_NOTE_FLOOR = 40
+ABS_NOTE_CEIL  = 88
 
-# Ceiling is just to keep things musical and not piercing.
-ABS_NOTE_CEIL = 88
-
-# Preferred bass zone (strongly enforced by scoring + repair)
 BASS_PREF_MIN = 40
 BASS_PREF_MAX = 52
 
-# Hard bass clamp (even if preferences fail)
 BASS_HARD_MIN = ABS_NOTE_FLOOR
 BASS_HARD_MAX = 60
 
-# Smoothness and spacing
 MAX_BASS_JUMP = 7
 
-# Default voicing “shape” targets (you can tweak later easily)
 TARGET_CENTER = 60.0
 
 IDEAL_SPAN = 12
-MIN_SPAN = 8
-MAX_SPAN = 18
+MIN_SPAN   = 8
+MAX_SPAN   = 18
 
 MIN_ADJ_GAP = 2
 MAX_ADJ_GAP = 9
 HARD_MAX_ADJ_GAP = 12
 
-# Shared tone safety
 MAX_SHARED_DEFAULT = 2
-MAX_SHARED_MIN11 = 3
+MAX_SHARED_MIN11   = 3
 
-# Keep voicing from staying identical to raw (optional)
 ENFORCE_NOT_RAW_WHEN_VOICING = True
 RAW_PENALTY = 1200
 
-# Prevent semitone “glue clusters” low down
-GLUE_LOW_CUTOFF = 48
-GLUE_PROBABILITY = 0.28
+GLUE_LOW_CUTOFF  = 44
+GLUE_PROBABILITY = 0.35
 
-# Cross-semitone repair resolution allowance
 ALLOW_RESOLVE_TO_THIRD = True
 ALLOW_RESOLVE_TO_FIFTH = False
+
+
+# -------------------------
+# NEW: VOICING MODES
+# -------------------------
+# Default is the new "tight voice-leading melt" behavior.
+VOICING_MODE = "default"  # "default" | "wide" | "low"
+
+# A profile is just weights + range targets for scoring.
+# Movement dominates in default/low, less so in wide.
+VOICING_PROFILES = {
+    "default": dict(
+        lo=48, hi=76,
+        target_center=60.0,
+        ideal_span=12, min_span=8, max_span=18,
+        w_move=220.0,         # BIG: minimize total motion hard
+        w_leap=260.0,         # punish big single-voice jumps
+        w_center=70.0,        # mild register pull
+        w_span=55.0,          # keep compact
+        w_top=35.0,           # avoid too-bright top
+        w_shared_bonus=180.0  # reward shared pitch classes
+    ),
+    "wide": dict(
+        lo=48, hi=88,
+        target_center=66.0,
+        ideal_span=18, min_span=10, max_span=28,
+        w_move=95.0,          # less strict motion
+        w_leap=120.0,
+        w_center=55.0,
+        w_span=25.0,          # allow wider
+        w_top=10.0,           # allow brighter top
+        w_shared_bonus=70.0
+    ),
+    "low": dict(
+        lo=40, hi=72,
+        target_center=54.0,
+        ideal_span=12, min_span=8, max_span=18,
+        w_move=240.0,         # same melt, even stricter
+        w_leap=300.0,
+        w_center=120.0,       # strong pull lower
+        w_span=60.0,
+        w_top=110.0,          # strong anti-brightness
+        w_shared_bonus=200.0
+    ),
+}
 
 
 def parse_root_and_bass(ch: str):
@@ -1356,7 +1390,6 @@ def parse_root_and_bass(ch: str):
 
 
 def _force_into_range_by_octaves(p: int, lo: int, hi: int) -> int:
-    # shift by octaves only, preserves pitch class
     while p < lo:
         p += 12
     while p > hi:
@@ -1365,20 +1398,12 @@ def _force_into_range_by_octaves(p: int, lo: int, hi: int) -> int:
 
 
 def _sanitize_notes_strict(notes: List[int]) -> List[int]:
-    """
-    Absolute last-line safety:
-    - No pitch below ABS_NOTE_FLOOR
-    - No pitch above ABS_NOTE_CEIL
-    - Keep unique pitches (avoid duplicates) while preserving count by octave shifting
-    """
     v = [int(x) for x in notes]
-    # hard clamp with octave shifting (not simple clamp)
     out = []
     used = set()
     for p in sorted(v):
         p = _force_into_range_by_octaves(p, ABS_NOTE_FLOOR, ABS_NOTE_CEIL)
 
-        # de-dupe by moving up an octave if needed
         while p in used and (p + 12) <= ABS_NOTE_CEIL:
             p += 12
         while p in used and (p - 12) >= ABS_NOTE_FLOOR:
@@ -1389,9 +1414,7 @@ def _sanitize_notes_strict(notes: List[int]) -> List[int]:
 
     out = sorted(out)
 
-    # Final guarantee
     if out and min(out) < ABS_NOTE_FLOOR:
-        # push everything up together until ok
         shift = 0
         while min(out) + shift < ABS_NOTE_FLOOR:
             shift += 12
@@ -1404,17 +1427,10 @@ def _sanitize_notes_strict(notes: List[int]) -> List[int]:
 
 
 def _prefer_bass_zone(notes: List[int]) -> List[int]:
-    """
-    Makes the *lowest* note (bass) land in the preferred zone when possible.
-    Shifts the whole chord together by octaves to keep shape.
-    """
     if not notes:
         return notes
 
     v = sorted(notes)
-    b = min(v)
-
-    # Choose octave shift that brings bass closest to the preferred range center
     pref_center = (BASS_PREF_MIN + BASS_PREF_MAX) / 2.0
     options = []
     for k in range(-4, 5):
@@ -1424,8 +1440,8 @@ def _prefer_bass_zone(notes: List[int]) -> List[int]:
         bb = min(vv)
         if bb < BASS_HARD_MIN or bb > BASS_HARD_MAX:
             continue
+
         dist = 0.0
-        # heavily favor bass inside preferred window
         if bb < BASS_PREF_MIN:
             dist += (BASS_PREF_MIN - bb) * 25.0
         elif bb > BASS_PREF_MAX:
@@ -1441,10 +1457,6 @@ def _prefer_bass_zone(notes: List[int]) -> List[int]:
 
 
 def chord_to_midi(chord_name: str, base_oct=3) -> List[int]:
-    """
-    Raw chord tones, but registered safely.
-    The lowest note will be kept in the bass zone.
-    """
     root, rest, bass = parse_root_and_bass(chord_name)
 
     if root not in NOTE_TO_SEMITONE:
@@ -1455,13 +1467,11 @@ def chord_to_midi(chord_name: str, base_oct=3) -> List[int]:
         raise ValueError(f"Unrecognized chord quality: {rest}")
 
     root_pc = NOTE_TO_SEMITONE[root]
-    # Start root around base_oct, but final register is decided by _prefer_bass_zone
     root_midi = 12 * (base_oct + 1) + root_pc
 
     tones = QUAL_TO_INTERVALS[quality]
     notes = [root_midi + iv for iv in tones]
 
-    # Slash bass support if it ever appears
     if bass:
         if bass not in NOTE_TO_SEMITONE:
             raise ValueError(f"Bad slash bass '{bass}' in '{chord_name}'")
@@ -1565,7 +1575,8 @@ def repair_cross_semitones(prev_notes: List[int], cur_notes: List[int], allowed_
                 test[idx] = n2
                 test = sorted(test)
                 remaining = len(bad_cross_semitone_indices(prev_notes, test, allowed_target_pcs))
-                options.append((remaining, abs(center(test) - TARGET_CENTER), span(test), abs(min(test) - ((BASS_PREF_MIN + BASS_PREF_MAX) / 2.0)), test))
+                options.append((remaining, abs(center(test) - TARGET_CENTER), span(test),
+                                abs(min(test) - ((BASS_PREF_MIN + BASS_PREF_MAX) / 2.0)), test))
             if options:
                 options.sort(key=lambda x: (x[0], x[1], x[2], x[3]))
                 v = options[0][4]
@@ -1602,32 +1613,38 @@ def bass_penalty(prev: Optional[List[int]], cur: List[int]) -> float:
 
 
 def _min_assignment_move(prev: List[int], cur: List[int]) -> float:
+    # Stable matching: sort both. (Permutation solver is expensive and overkill here.)
     p = sorted(prev)
     c = sorted(cur)
     if not p or not c:
         return 0.0
-
-    if len(p) != len(c):
-        return float(sum(min(abs(x - y) for y in p) for x in c))
-
-    import itertools
-    best = None
-    for perm in itertools.permutations(c):
-        s = 0.0
-        for i in range(len(p)):
-            s += abs(perm[i] - p[i])
-        if best is None or s < best:
-            best = s
-    return float(best if best is not None else 0.0)
+    m = min(len(p), len(c))
+    return float(sum(abs(c[i] - p[i]) for i in range(m)))
 
 
-def generate_voicing_candidates(raw_notes: List[int]) -> List[List[int]]:
+def _shared_pc_count(prev: List[int], cur: List[int]) -> int:
+    return len(set([n % 12 for n in prev]) & set([n % 12 for n in cur]))
+
+
+def _max_single_leap(prev: List[int], cur: List[int]) -> int:
+    p = sorted(prev)
+    c = sorted(cur)
+    m = min(len(p), len(c))
+    if m == 0:
+        return 0
+    return int(max(abs(c[i] - p[i]) for i in range(m)))
+
+
+def generate_voicing_candidates(raw_notes: List[int], mode: str) -> List[List[int]]:
     """
-    Candidate generation is now *range-aware*:
-    - Never generate anything below ABS_NOTE_FLOOR
-    - Never generate anything above ABS_NOTE_CEIL
-    - Prefer keeping chord in a coherent register
+    Generates candidates and lets the scoring decide.
+    Still:
+    - never below ABS_NOTE_FLOOR
+    - never above ABS_NOTE_CEIL
+    - bass must remain inside hard clamp
     """
+    prof = VOICING_PROFILES.get(mode, VOICING_PROFILES["default"])
+
     base = _sanitize_notes_strict(raw_notes)
     n = len(base)
     if n == 0:
@@ -1639,36 +1656,44 @@ def generate_voicing_candidates(raw_notes: List[int]) -> List[List[int]]:
         v = _sanitize_notes_strict(v)
         if len(v) != n:
             return
-        # Hard reject if bass is out of hard clamp
         b = min(v)
         if b < BASS_HARD_MIN or b > BASS_HARD_MAX:
             return
-        candidates.add(tuple(v))
+        if min(v) < ABS_NOTE_FLOOR or max(v) > ABS_NOTE_CEIL:
+            return
+        candidates.add(tuple(sorted(v)))
 
-    # Start from base, then octave-register it into preferred bass zone
+    # Start from base, register into bass zone
     add(_prefer_bass_zone(base))
 
-    # Inversions (but keep registered)
+    # Inversions + octave placement
     inv = base[:]
     for _ in range(n - 1):
         inv = inv[1:] + [inv[0] + 12]
         add(_prefer_bass_zone(inv))
 
-    # Controlled “spread” moves (only mild, avoids crazy gaps)
-    for k in range(1, n):
-        v1 = base[:]
+    # Whole chord octave shifts (more options for wide/low via profile range)
+    for shift in (-24, -12, 0, 12, 24):
+        v = [x + shift for x in base]
+        v = _sanitize_notes_strict(v)
+        # keep within profile range loosely (scoring will do the rest)
+        if v and (min(v) < prof["lo"] - 12 or max(v) > prof["hi"] + 12):
+            continue
+        add(_prefer_bass_zone(v))
+
+    # Spread variants
+    # Default/low: mild spread only. Wide: allow more.
+    max_k = min(2, n - 1) if mode in ("default", "low") else min(3, n - 1)
+    for k in range(1, max_k + 1):
+        v_up = base[:]
         for i in range(n - k, n):
-            v1[i] += 12
-        add(_prefer_bass_zone(v1))
+            v_up[i] += 12
+        add(_prefer_bass_zone(v_up))
 
-        v2 = base[:]
+        v_dn = base[:]
         for i in range(0, k):
-            v2[i] -= 12
-        add(_prefer_bass_zone(v2))
-
-    # Whole-chord octave shifts, limited
-    for shift in (-12, 0, 12):
-        add(_prefer_bass_zone([x + shift for x in base]))
+            v_dn[i] -= 12
+        add(_prefer_bass_zone(v_dn))
 
     out = [list(c) for c in candidates]
     return out if out else [_prefer_bass_zone(base)]
@@ -1682,20 +1707,24 @@ def choose_best_voicing(
     key_name: str,
     rng: random.Random
 ) -> List[int]:
-    raw_clean = _prefer_bass_zone(_sanitize_notes_strict(raw_notes))
-    cands = generate_voicing_candidates(raw_clean)
 
-    # Glue filter
+    mode = VOICING_MODE  # NEW: default/wide/low
+    prof = VOICING_PROFILES.get(mode, VOICING_PROFILES["default"])
+
+    raw_clean = _prefer_bass_zone(_sanitize_notes_strict(raw_notes))
+    cands = generate_voicing_candidates(raw_clean, mode)
+
+    # Glue filter (keep your behavior)
     filtered = [v for v in cands if glue_ok(v, rng)]
     if filtered:
         cands = filtered
 
-    # Repair cross-semitones
+    # Repair cross-semitones (keep your behavior)
     if prev_voicing is not None:
         allowed_pcs = allowed_resolution_pcs(key_name)
         cands = [repair_cross_semitones(prev_voicing, v, allowed_pcs) for v in cands]
 
-    # Shared tone cap
+    # Shared tone cap (keep your behavior)
     if prev_voicing is not None:
         limit = max_shared_allowed(prev_name, cur_name)
         filtered = [v for v in cands if shared_pitch_count(prev_voicing, v) <= limit]
@@ -1705,11 +1734,14 @@ def choose_best_voicing(
     def cost(v: List[int]) -> float:
         v = _prefer_bass_zone(_sanitize_notes_strict(v))
 
-        # Absolute safety penalties (should never happen, but keep as guard)
+        if not v:
+            return 1e12
         if min(v) < ABS_NOTE_FLOOR:
             return 1e12
+        if max(v) > ABS_NOTE_CEIL:
+            return 1e12
 
-        # Bass preference penalty
+        # Bass preference penalty (unchanged)
         b = min(v)
         bass_pref_pen = 0.0
         if b < BASS_PREF_MIN:
@@ -1717,35 +1749,59 @@ def choose_best_voicing(
         elif b > BASS_PREF_MAX:
             bass_pref_pen += (b - BASS_PREF_MAX) * 300.0
 
-        # Register and span
-        reg_pen = abs(center(v) - TARGET_CENTER) * 120.0
+        # Mode-aware register + span targets
+        reg_pen = abs(center(v) - prof["target_center"]) * prof["w_center"]
         sp = span(v)
 
-        span_pen = abs(sp - IDEAL_SPAN) * 80.0
-        if sp < MIN_SPAN:
-            span_pen += (MIN_SPAN - sp) * 1200.0
-        if sp > MAX_SPAN:
-            span_pen += (sp - MAX_SPAN) * 800.0
+        span_pen = abs(sp - prof["ideal_span"]) * prof["w_span"]
+        if sp < prof["min_span"]:
+            span_pen += (prof["min_span"] - sp) * 1200.0
+        if sp > prof["max_span"]:
+            span_pen += (sp - prof["max_span"]) * 800.0
 
-        # Spacing and motion
+        # Keep your spacing + bass jump penalty
         space_pen = spacing_penalty(v)
-        move_pen = 0.0 if prev_voicing is None else _min_assignment_move(prev_voicing, v) * 3.0
         b_pen = bass_penalty(prev_voicing, v)
 
-        # Avoid exact repeats
+        # NEW: Default voice-leading melt
+        move_pen = 0.0
+        leap_pen = 0.0
+        shared_bonus = 0.0
+
+        if prev_voicing is not None:
+            move_pen = _min_assignment_move(prev_voicing, v) * prof["w_move"]
+            # punish any single voice that leaps too much (beyond 5 semitones)
+            worst = _max_single_leap(prev_voicing, v)
+            if worst > 5:
+                leap_pen = ((worst - 5) ** 2) * prof["w_leap"]
+            # reward shared pitch classes (not exact pitches)
+            shared = _shared_pc_count(prev_voicing, v)
+            shared_bonus = -shared * prof["w_shared_bonus"]
+
+        # NEW: top note brightness control
+        top = max(v)
+        top_pen = 0.0
+        # penalize top being close to ceiling; stronger in low mode
+        if top > (prof["hi"] - 6):
+            top_pen = (top - (prof["hi"] - 6)) * prof["w_top"]
+
+        # Avoid exact repeats (keep)
         repeat_pen = 900.0 if (prev_voicing is not None and sorted(prev_voicing) == sorted(v)) else 0.0
 
-        # Avoid “raw” if desired
+        # Avoid “raw” if desired (keep)
         raw_pen = 0.0
         if ENFORCE_NOT_RAW_WHEN_VOICING and is_raw_shape(v, raw_clean):
             raw_pen = RAW_PENALTY
 
-        return bass_pref_pen + reg_pen + span_pen + space_pen + move_pen + b_pen + repeat_pen + raw_pen
+        return (bass_pref_pen + reg_pen + span_pen + space_pen +
+                move_pen + leap_pen + shared_bonus + top_pen +
+                b_pen + repeat_pen + raw_pen)
 
     cands.sort(key=cost)
     best = cands[0] if cands else raw_clean
     best = _prefer_bass_zone(_sanitize_notes_strict(best))
     return best
+
 # =========================================================
 # GLOBAL TIMING + EXPORT SETTINGS
 # =========================================================
