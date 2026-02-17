@@ -1178,88 +1178,89 @@ def generate_progressions(
 # =========================================================
 # MIDI note reference:
 # C2=36, E2=40, C3=48, E3=52, C4=60
-VOICING_PROFILE_KEY = "aa_voicing_profile_v1"
+
+VOICING_PROFILE_KEY = "aa_voicing_profile_v2"
 
 VOICING_PROFILES = {
-    # You can change these numbers anytime.
-    "Default": {
-        "global_low": 33,      # allow deep lows in engine; penalties keep it safe
-        "global_high": 84,
+    # DEFAULT = Voice-led "tight melt" (min movement + shared tones)
+    "Default (Tight Voice-Led)": {
+        # global candidate generation range (scoring + hard rules keep it safe)
+        "global_low": 40,       # ABS floor target (E2=40) for your Logic-safe world
+        "global_high": 88,      # C6-ish
 
-        "bass_soft_min": 40,   # preferred bass zone (E2)
-        "bass_soft_max": 52,   # (E3)
-        "bass_hard_min": 36,   # hard floor (C2)
-        "bass_hard_max": 60,   # hard ceiling (G3-ish)
-        "bass_center": 46,     # gravity center for bass (Bb2)
-        "max_bass_jump": 7,    # semitones
+        # bass rules
+        "bass_soft_min": 40,    # E2
+        "bass_soft_max": 52,    # E3
+        "bass_hard_min": 40,    # HARD: never below this (your absolute floor)
+        "bass_hard_max": 60,    # G3-ish
+        "bass_center": 46,      # Bb2 gravity
+        "max_bass_jump": 7,     # semitones
 
-        "target_center": 60.0, # chord register center (C4)
+        # chord register / shape targets
+        "target_center": 60.0,  # C4
         "ideal_span": 12,
         "min_span": 8,
         "max_span": 18,
 
+        # spacing constraints
         "min_adj_gap": 2,
         "max_adj_gap": 9,
         "hard_max_adj_gap": 12,
 
-        "max_register_jump": 7,  # whole-chord center jump between chords (semitones)
+        # register movement constraints
+        "max_register_jump": 7,  # center jump between chords
+
+        # NEW: scoring weights for the voice-leading engine
+        # Default should feel "glued" and smooth.
+        "w_move": 220.0,         # total movement weight (dominant)
+        "w_leap": 260.0,         # punish big single-voice leaps
+        "w_shared_pc": 180.0,    # reward shared pitch classes
+        "w_top_bright": 35.0,    # mild top-note brightness penalty
     },
-    "Tight": {
-        "global_low": 33,
-        "global_high": 84,
 
-        "bass_soft_min": 41,
-        "bass_soft_max": 52,
-        "bass_hard_min": 38,
-        "bass_hard_max": 55,
-        "bass_center": 47,
-        "max_bass_jump": 6,
-
-        "target_center": 60.0,
-        "ideal_span": 9,
-        "min_span": 7,
-        "max_span": 14,
-
-        "min_adj_gap": 2,
-        "max_adj_gap": 7,
-        "hard_max_adj_gap": 10,
-
-        "max_register_jump": 6,
-    },
-    "Wide": {
-        "global_low": 33,
-        "global_high": 84,
+    # WIDE = Cinematic voicings (bigger spread + slightly higher center)
+    "Wide (Cinematic)": {
+        "global_low": 40,
+        "global_high": 92,      # allow brighter cinematic top
 
         "bass_soft_min": 40,
         "bass_soft_max": 52,
-        "bass_hard_min": 36,
-        "bass_hard_max": 55,
+        "bass_hard_min": 40,
+        "bass_hard_max": 60,
         "bass_center": 46,
-        "max_bass_jump": 7,
+        "max_bass_jump": 8,
 
-        "target_center": 62.0,
-        "ideal_span": 16,
+        "target_center": 66.0,  # higher center
+        "ideal_span": 18,
         "min_span": 10,
-        "max_span": 22,
+        "max_span": 28,
 
         "min_adj_gap": 2,
         "max_adj_gap": 11,
         "hard_max_adj_gap": 14,
 
-        "max_register_jump": 8,
+        "max_register_jump": 9,
+
+        # scoring weights: less strict glue, more freedom
+        "w_move": 95.0,
+        "w_leap": 120.0,
+        "w_shared_pc": 70.0,
+        "w_top_bright": 10.0,
     },
-    "Deep Low Ambient": {
-        "global_low": 33,
-        "global_high": 84,
 
-        "bass_soft_min": 36,  # C2
-        "bass_soft_max": 48,  # C3
-        "bass_hard_min": 33,  # A1-ish rare
-        "bass_hard_max": 52,  # E3
-        "bass_center": 42,    # F#2
-        "max_bass_jump": 5,
+    # LOW AMBIENT = Voice-led but biased low (warmer/darker, avoids bright top)
+    "Low Ambient (Prefer Lower)": {
+        "global_low": 40,       # keep your absolute safety
+        "global_high": 76,      # lower ceiling = darker
 
-        "target_center": 58.0,
+        "bass_soft_min": 40,
+        "bass_soft_max": 48,    # keep bass lower more often
+        "bass_hard_min": 40,
+        "bass_hard_max": 55,
+        "bass_center": 43,      # around G2
+        "max_bass_jump": 6,
+
+        "target_center": 54.0,  # lower chord center
         "ideal_span": 12,
         "min_span": 8,
         "max_span": 18,
@@ -1269,17 +1270,25 @@ VOICING_PROFILES = {
         "hard_max_adj_gap": 12,
 
         "max_register_jump": 6,
+
+        # scoring weights: very glued, very low-biased
+        "w_move": 240.0,
+        "w_leap": 300.0,
+        "w_shared_pc": 200.0,
+        "w_top_bright": 110.0,  # strong anti-brightness
     },
 }
 
 
 def get_voicing_profile_name() -> str:
-    name = st.session_state.get(VOICING_PROFILE_KEY, "Default")
-    return name if name in VOICING_PROFILES else "Default"
+    # Keep compatibility: if user had old saved value, fall back cleanly.
+    name = st.session_state.get(VOICING_PROFILE_KEY, "Default (Tight Voice-Led)")
+    return name if name in VOICING_PROFILES else "Default (Tight Voice-Led)"
 
 
 def get_voicing_profile() -> dict:
     return VOICING_PROFILES[get_voicing_profile_name()]
+
 
 
 # =========================================================
@@ -1313,8 +1322,8 @@ MIN_ADJ_GAP = 2
 MAX_ADJ_GAP = 9
 HARD_MAX_ADJ_GAP = 12
 
-MAX_SHARED_DEFAULT = 2
-MAX_SHARED_MIN11   = 3
+MAX_SHARED_DEFAULT = 3
+MAX_SHARED_MIN11   = 4
 
 ENFORCE_NOT_RAW_WHEN_VOICING = True
 RAW_PENALTY = 1200
